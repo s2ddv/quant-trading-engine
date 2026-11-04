@@ -22,3 +22,14 @@ PYTHONPATH=src python3 -c 'from qtre import load_snapshot; print(load_snapshot("
 Para regenerar as fixtures: `python3 examples/generate_fixtures.py` e `python3 examples/generate_f1_fixture.py`. Cada script sobrescreve somente seus próprios arquivos JSON sintéticos em `examples/`.
 
 O hash identifica o conteúdo validado do snapshot. Ele não demonstra autenticidade de fornecedor, licença de dados, calendário oficial ou ausência de viés; esses pontos pertencem às fases F3/F4.
+
+## Sondagem exploratória com yfinance
+
+O adaptador opcional consulta OHLC bruto, volume, dividendos e splits via `yfinance` e imprime um resumo de cobertura, sem gravar preços no repositório:
+
+```bash
+pip install -e '.[yahoo]'
+PYTHONPATH=src python3 -m qtre.data.yfinance_probe --start 2024-01-01 --end 2025-03-01
+```
+
+Por padrão, consulta `PETR4.SA`, `VALE3.SA`, `ITUB4.SA`, `BBDC4.SA` e `ABEV3.SA`. O intervalo final é exclusivo. A saída traz versão da biblioteca, instante de coleta, quantidade de sessões, lacunas OHLC, volume zero e contagem de eventos. O adaptador **não** cria `Snapshot` causal nem alimenta o backtest F1: a resposta histórica não fornece `available_at` e revisões por registro, calendário oficial versionado, universo histórico com saídas ou evento de abertura com horário de publicação verificado. A coorte de cinco tickers foi escolhida hoje e não demonstra ausência de viés de sobrevivência.
