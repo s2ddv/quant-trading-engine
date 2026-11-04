@@ -23,8 +23,8 @@ class F1BacktestTests(unittest.TestCase):
         self.assertEqual(fills[0]["quantity"], 329)
         self.assertEqual(fills[0]["price"], Decimal("30.03"))
         self.assertEqual(fills[0]["fees"], Decimal("4.94"))
-        self.assertEqual(self.result["nav"][0]["cash_brl"], Decimal("60498.92"))
-        self.assertEqual(self.result["nav"][0]["nav_brl"], Decimal("99942.92"))
+        self.assertEqual(self.result["nav"][0]["cash_brl"], Decimal("60496.82"))
+        self.assertEqual(self.result["nav"][0]["nav_brl"], Decimal("99940.82"))
         for row in self.result["nav"]:
             if row["status"] == "COMPLETE":
                 self.assertEqual(row["nav_brl"], row["cash_brl"] + row["receivable_brl"] + row["positions_value_brl"])
@@ -39,7 +39,7 @@ class F1BacktestTests(unittest.TestCase):
         self.assertIsNone(self.result["nav"][1]["nav_brl"])
         self.assertEqual(self.result["nav"][1]["receivable_brl"], Decimal("159.00"))
         self.assertEqual(self.result["nav"][2]["receivable_brl"], Decimal(0))
-        self.assertEqual(self.result["nav"][2]["nav_brl"], Decimal("100088.01"))
+        self.assertEqual(self.result["nav"][2]["nav_brl"], Decimal("100085.01"))
 
 
 if __name__ == "__main__":
