@@ -25,11 +25,13 @@ O hash identifica o conteúdo validado do snapshot. Ele não demonstra autentici
 
 ## Sondagem exploratória com yfinance
 
-O adaptador opcional consulta OHLC bruto, volume, dividendos e splits via `yfinance` e imprime um resumo de cobertura, sem gravar preços no repositório:
+O adaptador opcional consulta OHLC do fornecedor, volume, dividendos e splits via `yfinance` e imprime um resumo de cobertura, sem gravar preços no repositório. `auto_adjust=False` desativa o ajuste automático adicional da biblioteca; não certifica que os valores sejam os preços originais negociados:
 
 ```bash
 pip install -e '.[yahoo]'
 PYTHONPATH=src python3 -m qtre.data.yfinance_probe --start 2024-01-01 --end 2025-03-01
 ```
 
-Por padrão, consulta `PETR4.SA`, `VALE3.SA`, `ITUB4.SA`, `BBDC4.SA` e `ABEV3.SA`. O intervalo final é exclusivo. A saída traz versão da biblioteca, instante de coleta, quantidade de sessões, lacunas OHLC, volume zero e contagem de eventos. O adaptador **não** cria `Snapshot` causal nem alimenta o backtest F1: a resposta histórica não fornece `available_at` e revisões por registro, calendário oficial versionado, universo histórico com saídas ou evento de abertura com horário de publicação verificado. A coorte de cinco tickers foi escolhida hoje e não demonstra ausência de viés de sobrevivência.
+Por padrão, consulta `PETR4.SA`, `VALE3.SA`, `ITUB4.SA`, `BBDC4.SA` e `ABEV3.SA`. O intervalo final é exclusivo. `keepna=True` preserva as linhas faltantes retornadas pelo fornecedor para auditoria. A saída verifica finitude/coerência OHLC, volumes, ações, duplicatas, ordenação e datas fora do intervalo. Volume zero recebe `REVIEW`; dado inválido recebe `INCOMPLETE`; falha de consulta recebe `FETCH_ERROR`. O comando termina com código 2 em caso de falha ou dados incompletos.
+
+A contagem de linhas não comprova cobertura de um calendário oficial. O adaptador **não** cria `Snapshot` causal nem alimenta o backtest F1: a resposta histórica não fornece `available_at` e revisões por registro, calendário oficial versionado, universo histórico com saídas ou evento de abertura com horário de publicação verificado. A coorte de cinco tickers foi escolhida hoje e não demonstra ausência de viés de sobrevivência.
