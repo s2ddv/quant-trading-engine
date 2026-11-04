@@ -91,9 +91,12 @@ def _plan_orders(snapshot, signals, decision_at, sessions, config):
     reserve = (1 + (config.half_spread_bps + config.slippage_bps + config.fees_bps) / 10000
                + config.opening_reserve)
     bars = snapshot.available("bars", decision_at)
+    histories = {}
+    for bar in bars:
+        histories.setdefault(bar["instrument_id"], []).append(bar)
     orders = []
     for signal in selected:
-        history = sorted((r for r in bars if r["instrument_id"] == signal.instrument_id), key=lambda r: r["session"])
+        history = sorted(histories[signal.instrument_id], key=lambda r: r["session"])
         ref_bar = history[-1]
         ref = Decimal(str(ref_bar["close"]))
         quantity = int((config.initial_cash * weight / (ref * reserve)).to_integral_value(rounding=ROUND_DOWN))

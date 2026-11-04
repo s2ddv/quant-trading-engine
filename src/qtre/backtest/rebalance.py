@@ -110,6 +110,9 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
     eligible = {s.instrument_id: s for s in selected}
     bars = snapshot.available("bars", second_decision_at)
     formation_bars = {bar["instrument_id"]: bar for bar in bars if bar["session"] == day}
+    histories = {}
+    for bar in bars:
+        histories.setdefault(bar["instrument_id"], []).append(bar)
     orders = []
     for ident in sorted(set(book.positions) | set(eligible)):
         if ident not in formation_bars:
@@ -121,7 +124,7 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
         quantity = abs(delta) // config.lot * config.lot
         if not quantity:
             continue
-        history = sorted((r for r in bars if r["instrument_id"] == ident), key=lambda r: r["session"])
+        history = sorted(histories[ident], key=lambda r: r["session"])
         capacity = int(Decimal(min(r["volume_shares"] for r in history[-50:])) * config.max_participation) if len(history) >= 50 else 0
         input_keys = set(eligible[ident].input_keys if ident in eligible else ())
         input_keys.update(f"bar:{ident}:{r['session']}" for r in history[-50:])

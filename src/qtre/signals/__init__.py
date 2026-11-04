@@ -48,8 +48,14 @@ def _momentum_12_2(snapshot, decision_at, formation_session):
             raise ValueError("monthly history has a calendar gap")
     bars = {(r["instrument_id"], r["session"]): r for r in snapshot.available("bars", decision_at)}
     actions = snapshot.available("actions", decision_at)
+    actions_by_instrument = {}
+    for action in actions:
+        actions_by_instrument.setdefault(action["instrument_id"], []).append(action)
     memberships = listed_members(snapshot, formation, as_of=decision_at)
     known_memberships = snapshot.available("memberships", decision_at)
+    memberships_by_instrument = {}
+    for membership in known_memberships:
+        memberships_by_instrument.setdefault(membership["instrument_id"], []).append(membership)
     recent_sessions = [r["session"] for r in past[-63:]]
     results = []
     for instrument in memberships:
@@ -63,8 +69,8 @@ def _momentum_12_2(snapshot, decision_at, formation_session):
             }))
             results.append(Signal(instrument, decision_at, window[-2], latest, score,
                                   score is not None, reason, input_keys))
-        history = [r for r in known_memberships if r["instrument_id"] == instrument
-                   and r["valid_from"] <= formation and (r["valid_to"] is None or r["valid_to"] >= window[0])]
+        history = [r for r in memberships_by_instrument.get(instrument, ())
+                   if r["valid_from"] <= formation and (r["valid_to"] is None or r["valid_to"] >= window[0])]
         used.extend(history)
         required_days = [r["session"] for r in past if r["session"] >= window[0]]
         if any(not any(r["status"] in ("listed", "suspended") and r["valid_from"] <= day
@@ -91,8 +97,8 @@ def _momentum_12_2(snapshot, decision_at, formation_session):
         # change shares, never create an artificial loss in the score.
         shares = Decimal(1)
         start = Decimal(str(monthly[0]["close"]))
-        relevant = sorted((r for r in actions if r["instrument_id"] == instrument
-                           and window[0] < r["ex_session"] <= window[-2]),
+        relevant = sorted((r for r in actions_by_instrument.get(instrument, ())
+                           if window[0] < r["ex_session"] <= window[-2]),
                           key=lambda r: (r["ex_session"], r["action_id"]))
         for ex_session, rows in groupby(relevant, key=lambda r: r["ex_session"]):
             events = list(rows)
