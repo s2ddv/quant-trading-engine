@@ -1,0 +1,283 @@
+{
+  "actions": [
+    {
+      "action_id": "A-SPLIT",
+      "announced_at": "2025-01-30T18:00:00Z",
+      "available_at": "2025-01-30T18:01:00Z",
+      "ex_session": "2025-02-03",
+      "ingested_at": "2025-01-30T18:02:00Z",
+      "instrument_id": "SYN-001",
+      "kind": "split",
+      "observed_at": "2025-01-30T18:00:00Z",
+      "ratio": 2,
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1"
+    },
+    {
+      "action_id": "A-DIV",
+      "announced_at": "2025-01-30T18:00:00Z",
+      "available_at": "2025-01-30T18:01:00Z",
+      "cash_per_share": 0.5,
+      "ex_session": "2025-01-31",
+      "ingested_at": "2025-01-30T18:02:00Z",
+      "instrument_id": "SYN-002",
+      "kind": "dividend",
+      "observed_at": "2025-01-30T18:00:00Z",
+      "pay_session": "2025-02-03",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1"
+    }
+  ],
+  "as_of": "2025-02-04T00:00:00Z",
+  "bars": [
+    {
+      "adjustment_basis": "raw",
+      "available_at": "2025-01-30T20:05:00Z",
+      "close": 10.2,
+      "currency": "BRL",
+      "high": 10.4,
+      "ingested_at": "2025-01-30T20:06:00Z",
+      "instrument_id": "SYN-001",
+      "low": 9.8,
+      "observed_at": "2025-01-30T20:00:00Z",
+      "open": 10,
+      "session": "2025-01-30",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "volume_brl": 102000.0,
+      "volume_shares": 10000
+    },
+    {
+      "adjustment_basis": "raw",
+      "available_at": "2025-01-31T20:05:00Z",
+      "close": 11.2,
+      "currency": "BRL",
+      "high": 11.4,
+      "ingested_at": "2025-01-31T20:06:00Z",
+      "instrument_id": "SYN-001",
+      "low": 10.8,
+      "observed_at": "2025-01-31T20:00:00Z",
+      "open": 11,
+      "session": "2025-01-31",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "volume_brl": 112000.0,
+      "volume_shares": 10000
+    },
+    {
+      "adjustment_basis": "raw",
+      "available_at": "2025-02-03T20:05:00Z",
+      "close": 12.2,
+      "currency": "BRL",
+      "high": 12.4,
+      "ingested_at": "2025-02-03T20:06:00Z",
+      "instrument_id": "SYN-001",
+      "low": 11.8,
+      "observed_at": "2025-02-03T20:00:00Z",
+      "open": 12,
+      "session": "2025-02-03",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "volume_brl": 122000.0,
+      "volume_shares": 10000
+    },
+    {
+      "adjustment_basis": "raw",
+      "available_at": "2025-01-30T20:05:00Z",
+      "close": 20.2,
+      "currency": "BRL",
+      "high": 20.4,
+      "ingested_at": "2025-01-30T20:06:00Z",
+      "instrument_id": "SYN-002",
+      "low": 19.8,
+      "observed_at": "2025-01-30T20:00:00Z",
+      "open": 20,
+      "session": "2025-01-30",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "volume_brl": 202000.0,
+      "volume_shares": 10000
+    },
+    {
+      "adjustment_basis": "raw",
+      "available_at": "2025-01-31T20:05:00Z",
+      "close": 21.2,
+      "currency": "BRL",
+      "high": 21.4,
+      "ingested_at": "2025-01-31T20:06:00Z",
+      "instrument_id": "SYN-002",
+      "low": 20.8,
+      "observed_at": "2025-01-31T20:00:00Z",
+      "open": 21,
+      "session": "2025-01-31",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "volume_brl": 212000.0,
+      "volume_shares": 10000
+    }
+  ],
+  "calendar": {
+    "calendar_id": "synthetic-calendar-v1",
+    "sessions": [
+      {
+        "close_at": "2025-01-30T20:00:00Z",
+        "open_at": "2025-01-30T13:00:00Z",
+        "session": "2025-01-30"
+      },
+      {
+        "close_at": "2025-01-31T20:00:00Z",
+        "open_at": "2025-01-31T13:00:00Z",
+        "session": "2025-01-31"
+      },
+      {
+        "close_at": "2025-02-03T20:00:00Z",
+        "open_at": "2025-02-03T13:00:00Z",
+        "session": "2025-02-03"
+      }
+    ],
+    "timezone": "America/Sao_Paulo"
+  },
+  "memberships": [
+    {
+      "available_at": "2025-01-01T00:01:00Z",
+      "ingested_at": "2025-01-01T00:02:00Z",
+      "instrument_id": "SYN-001",
+      "observed_at": "2025-01-01T00:00:00Z",
+      "reason": "synthetic listing",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "status": "listed",
+      "valid_from": "2025-01-01",
+      "valid_to": null
+    },
+    {
+      "available_at": "2025-01-01T00:01:00Z",
+      "ingested_at": "2025-01-01T00:02:00Z",
+      "instrument_id": "SYN-002",
+      "observed_at": "2025-01-01T00:00:00Z",
+      "reason": "synthetic listing",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "status": "listed",
+      "valid_from": "2025-01-01",
+      "valid_to": null
+    }
+  ],
+  "opens": [
+    {
+      "available_at": "2025-01-30T13:00:00Z",
+      "currency": "BRL",
+      "ingested_at": "2025-01-30T13:01:00Z",
+      "instrument_id": "SYN-001",
+      "observed_at": "2025-01-30T13:00:00Z",
+      "open_price": 10,
+      "session": "2025-01-30",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "tradable": true
+    },
+    {
+      "available_at": "2025-01-31T13:00:00Z",
+      "currency": "BRL",
+      "ingested_at": "2025-01-31T13:01:00Z",
+      "instrument_id": "SYN-001",
+      "observed_at": "2025-01-31T13:00:00Z",
+      "open_price": 11,
+      "session": "2025-01-31",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "tradable": true
+    },
+    {
+      "available_at": "2025-02-03T13:00:00Z",
+      "currency": "BRL",
+      "ingested_at": "2025-02-03T13:01:00Z",
+      "instrument_id": "SYN-001",
+      "observed_at": "2025-02-03T13:00:00Z",
+      "open_price": 12,
+      "session": "2025-02-03",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "tradable": true
+    },
+    {
+      "available_at": "2025-01-30T13:00:00Z",
+      "currency": "BRL",
+      "ingested_at": "2025-01-30T13:01:00Z",
+      "instrument_id": "SYN-002",
+      "observed_at": "2025-01-30T13:00:00Z",
+      "open_price": 20,
+      "session": "2025-01-30",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "tradable": true
+    },
+    {
+      "available_at": "2025-01-31T13:00:00Z",
+      "currency": "BRL",
+      "ingested_at": "2025-01-31T13:01:00Z",
+      "instrument_id": "SYN-002",
+      "observed_at": "2025-01-31T13:00:00Z",
+      "open_price": 21,
+      "session": "2025-01-31",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "tradable": true
+    },
+    {
+      "available_at": "2025-02-03T13:00:00Z",
+      "currency": "BRL",
+      "ingested_at": "2025-02-03T13:01:00Z",
+      "instrument_id": "SYN-002",
+      "observed_at": "2025-02-03T13:00:00Z",
+      "open_price": 20,
+      "session": "2025-02-03",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "tradable": false
+    }
+  ],
+  "schema_version": 1,
+  "snapshot_id": "synthetic-adverse-v1",
+  "symbols": [
+    {
+      "available_at": "2025-01-01T00:01:00Z",
+      "ingested_at": "2025-01-01T00:02:00Z",
+      "instrument_id": "SYN-001",
+      "observed_at": "2025-01-01T00:00:00Z",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "ticker": "SYN1",
+      "valid_from": "2025-01-01",
+      "valid_to": null
+    },
+    {
+      "available_at": "2025-01-01T00:01:00Z",
+      "ingested_at": "2025-01-01T00:02:00Z",
+      "instrument_id": "SYN-002",
+      "observed_at": "2025-01-01T00:00:00Z",
+      "snapshot_id": "synthetic-adverse-v1",
+      "source_id": "synthetic-fixture",
+      "source_version": "1",
+      "ticker": "SYN2",
+      "valid_from": "2025-01-01",
+      "valid_to": null
+    }
+  ]
+}
