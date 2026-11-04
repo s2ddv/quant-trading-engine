@@ -131,12 +131,15 @@ class Snapshot:
     content_hash: str
     payload: Mapping[str, Any]
 
-    def available(self, collection: str, as_of: datetime) -> tuple[Mapping[str, Any], ...]:
-        """Return source records available by a decision instant; never mutate them."""
-        if as_of.tzinfo is None or as_of.utcoffset() is None:
+    def check_as_of(self, as_of: datetime) -> None:
+        if not isinstance(as_of, datetime) or as_of.tzinfo is None or as_of.utcoffset() is None:
             raise SnapshotError("as_of: timezone is required")
         if as_of > self.as_of:
             raise SnapshotError("as_of: later than frozen snapshot")
+
+    def available(self, collection: str, as_of: datetime) -> tuple[Mapping[str, Any], ...]:
+        """Return source records available by a decision instant; never mutate them."""
+        self.check_as_of(as_of)
         if collection not in ("bars", "opens", "actions", "memberships", "symbols"):
             raise SnapshotError(f"unknown collection: {collection}")
         return tuple(row for row in self.payload[collection] if _instant(row["available_at"], "available_at") <= as_of)
@@ -155,6 +158,7 @@ def parse_snapshot(payload: Any) -> Snapshot:
     if not isinstance(cal["sessions"], list) or not cal["sessions"]:
         _fail("calendar.sessions", "expected non-empty list")
     sessions: set[str] = set()
+    session_clocks: dict[str, tuple[datetime, datetime]] = {}
     prev: date | None = None
     prev_close: datetime | None = None
     for n, row in enumerate(cal["sessions"]):
@@ -173,6 +177,7 @@ def parse_snapshot(payload: Any) -> Snapshot:
         if prev_close is not None and opened <= prev_close:
             _fail(path, "session clocks overlap")
         sessions.add(row["session"])
+        session_clocks[row["session"]] = (opened, closed)
         prev = day
         prev_close = closed
 
@@ -205,7 +210,7 @@ def parse_snapshot(payload: Any) -> Snapshot:
                 _money(row["volume_brl"], f"{path}.volume_brl")
                 if row["adjustment_basis"] != "raw":
                     _fail(f"{path}.adjustment_basis", "F0 execution bars must be raw")
-                close_at = _instant(next(s["close_at"] for s in cal["sessions"] if s["session"] == row["session"]), "close_at")
+                close_at = session_clocks[row["session"]][1]
                 if _instant(row["observed_at"], "observed_at") < close_at:
                     _fail(path, "complete bar observed before session close")
                 if _instant(row["available_at"], "available_at") < close_at:
@@ -214,7 +219,9 @@ def parse_snapshot(payload: Any) -> Snapshot:
                 _money(row["open_price"], f"{path}.open_price", positive=True)
                 if type(row["tradable"]) is not bool:
                     _fail(f"{path}.tradable", "expected boolean")
-                open_at = _instant(next(s["open_at"] for s in cal["sessions"] if s["session"] == row["session"]), "open_at")
+                open_at = session_clocks[row["session"]][0]
+                if _instant(row["observed_at"], "observed_at") < open_at:
+                    _fail(path, "open event observed before session open")
                 if _instant(row["available_at"], "available_at") < open_at:
                     _fail(path, "open event available before session open")
             elif collection == "actions":
@@ -224,6 +231,8 @@ def parse_snapshot(payload: Any) -> Snapshot:
                 announced = _instant(row["announced_at"], f"{path}.announced_at")
                 if announced > _instant(row["available_at"], "available_at"):
                     _fail(path, "announcement after availability")
+                if row["ex_session"] not in sessions:
+                    _fail(f"{path}.ex_session", "not in calendar")
                 for key in ("ex_session", "record_session", "pay_session"):
                     if key in row and row[key] is not None and row[key] not in sessions:
                         _fail(f"{path}.{key}", "not in calendar")
@@ -233,6 +242,8 @@ def parse_snapshot(payload: Any) -> Snapshot:
                     _money(row.get("cash_per_share"), f"{path}.cash_per_share")
                     if not row.get("pay_session"):
                         _fail(path, "dividend requires pay_session")
+                    if row["pay_session"] < row["ex_session"]:
+                        _fail(path, "dividend payment before ex_session")
             else:
                 start = _date(row["valid_from"], f"{path}.valid_from")
                 end = _date(row["valid_to"], f"{path}.valid_to") if row["valid_to"] is not None else None

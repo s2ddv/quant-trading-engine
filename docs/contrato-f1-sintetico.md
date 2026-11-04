@@ -10,6 +10,10 @@ Exemplo esperado sem proventos: SYN-001 fecha janeiro de 2024 a R$ 10, dezembro 
 
 Saída da primeira etapa: membros datados e sinais com `decision_at`, `feature_end_session`, `input_max_available_at`, `score`, `eligible` e `reason`. Testes comparam o valor manual e verificam que alterar dados publicados depois da decisão preserva os sinais.
 
+Regras refinadas na revisão: `input_keys` identifica as barras, associações e ações efetivamente consultadas. Intervalos consecutivos de associação preservam o histórico; uma lacuna no cadastro torna o instrumento inelegível. Dias com volume zero não contam para o mínimo de 50 observações negociadas. Os cálculos usam contexto decimal fixo de 28 dígitos, independente do código chamador. Dividendos com a mesma data ex são somados antes de um único reinvestimento no fechamento; quando há split na mesma data, o valor por ação é definido na unidade posterior ao split.
+
+Uma decisão atrasada pode declarar `formation_session="2025-01-31"`: os dados devem estar disponíveis até `decision_at`, mas as janelas de histórico/liquidez continuam terminando na formação. O calendário precisa confirmar que a formação é o último pregão do mês. Instantes sem fuso ou posteriores ao snapshot são rejeitados antes do cálculo.
+
 ## Carteira, execução e livro da fixture
 
 Entrada: cinco sinais elegíveis em 31/01/2025 às 20:07 UTC, caixa inicial R$ 100.000, peso-alvo máximo de 10% por nome, lote 1, reserva de 1% para desvio da abertura mais 15 bps de custo, spread de 5 bps, slippage de 5 bps e taxa de 5 bps. Dimensionar com o fechamento de 31/01 já publicado. Capacidade por abertura = 5% do menor volume de ações das últimas 50 barras publicadas antes da decisão. Ordens vencem após três sessões sintéticas. Nenhuma abertura ou barra futura participa do dimensionamento.

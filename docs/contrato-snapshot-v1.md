@@ -20,6 +20,8 @@ As coleções obrigatórias são `bars`, `opens`, `actions`, `memberships` e `sy
 
 Preços são números decimais de entrada e são verificados com `Decimal`; hashes usam a representação JSON canônica original, sem normalizar `10` e `10.0` como iguais. Este contrato valida dados estruturais e disponibilidade temporal. A F1 acrescentará regras econômicas entre registros, contabilidade de ações corporativas, lotes e sinal 12–2.
 
+Regras temporais adicionais: o `observed_at` de uma abertura não pode preceder a abertura da sessão; `ex_session` não pode ser nulo e o pagamento de um dividendo não pode ocorrer antes de sua data ex. A ordem entre eventos corporativos e fills pertence ao consumidor F1.
+
 ## Identidade do conteúdo
 
 O `content_hash` é SHA-256 do objeto JSON com chaves ordenadas, UTF-8, sem espaços supérfluos e sem `NaN`/infinito. Ordem das listas é parte do conteúdo; refazer uma fixture com o mesmo conteúdo preserva o hash. Revisão de um registro cria outro hash. O hash não é assinatura de origem nem `run_id` de backtest.
