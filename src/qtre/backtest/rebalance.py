@@ -12,7 +12,7 @@ from qtre.universe import listed_members
 from . import F1Config, _Book, _affordable_fill, _quote, instant, money, run_f1
 
 
-REBALANCE_MODEL = "synthetic-f1-two-formations-v1"
+REBALANCE_MODEL = "synthetic-f1-two-formations-v2"
 
 
 def _mark(snapshot, book, day, valued_at):
@@ -79,12 +79,6 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
     if first["nav"][-1]["status"] != "COMPLETE":
         raise ValueError("second formation requires a complete opening NAV")
 
-    # This cut does not silently skip corporate actions between the two windows.
-    for action in snapshot.available("actions", second_decision_at):
-        if first["nav"][-1]["session"] < action["ex_session"] <= day or (
-            action.get("pay_session") and first["nav"][-1]["session"] < action["pay_session"] <= day):
-            raise ValueError("intervening corporate action requires a continuous book")
-
     sessions = [s for s in snapshot.payload["calendar"]["sessions"]
                 if instant(s["open_at"]) > second_decision_at][:config.expiry_sessions]
     if len(sessions) != config.expiry_sessions:
@@ -106,10 +100,20 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
                         for action_id, row in unpaid.items()}
     if sum(book.receivables.values(), Decimal(0)) != first["nav"][-1]["receivable_brl"]:
         raise ValueError("opening receivables do not reconcile")
-    formed_at = instant(formation["close_at"]) + timedelta(minutes=config.mark_delay_minutes)
-    if formed_at > second_decision_at:
-        raise ValueError("second decision precedes formation mark")
-    formation_nav = _mark(snapshot, book, day, formed_at)
+    bridge = [s for s in snapshot.payload["calendar"]["sessions"]
+              if first["nav"][-1]["session"] < s["session"] <= day]
+    bridge_nav = []
+    for session in bridge:
+        bridge_day = session["session"]
+        open_at = instant(session["open_at"])
+        valued_at = instant(session["close_at"]) + timedelta(minutes=config.mark_delay_minutes)
+        snapshot.check_as_of(valued_at)
+        if bridge_day == day and valued_at > second_decision_at:
+            raise ValueError("second decision precedes formation mark")
+        book.actions(snapshot, bridge_day, open_at, bridge[0]["session"], {})
+        book.actions(snapshot, bridge_day, valued_at, bridge[0]["session"], {})
+        bridge_nav.append(_mark(snapshot, book, bridge_day, valued_at))
+    formation_nav = bridge_nav[-1]
     if formation_nav["status"] != "COMPLETE":
         raise ValueError("second formation has incomplete NAV")
     signals = momentum_12_2(snapshot, decision_at=second_decision_at, formation_session=day)
@@ -202,8 +206,9 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
             state.update(status="EXPIRED", reason="expiry_session_reached")
 
     manifest = dict(first["manifest"])
-    manifest.update(schema_version=3, model_id=REBALANCE_MODEL,
+    manifest.update(schema_version=4, model_id=REBALANCE_MODEL,
                     second_decision_at=second_decision_at.isoformat(), second_formation_session=day,
+                    bridge_sessions=[s["session"] for s in bridge],
                     decision_windows=[dict(decision_at=first["manifest"]["decision_at"],
                                            formation_session=first["manifest"]["formation_session"],
                                            execution_sessions=[r["session"] for r in first["nav"]]),
@@ -216,4 +221,4 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
                 orders=first["orders"] + tuple(orders),
                 order_states=first["order_states"] + tuple(states.values()),
                 fills=first["fills"] + tuple(fills), ledger=first["ledger"] + tuple(book.ledger),
-                nav=first["nav"] + tuple(nav), formation_nav=formation_nav)
+                nav=first["nav"] + tuple(bridge_nav[:-1]) + tuple(nav), formation_nav=formation_nav)

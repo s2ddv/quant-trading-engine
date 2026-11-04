@@ -15,6 +15,7 @@ FILES = ("snapshot.json", "orders.jsonl", "order_states.jsonl", "fills.jsonl", "
 TABLES = ("orders", "order_states", "fills", "ledger", "nav")
 SCHEMA_VERSION = 1
 REBALANCE_SCHEMA_VERSION = 2
+CONTINUOUS_SCHEMA_VERSION = 3
 CENT = Decimal("0.01")
 
 
@@ -63,7 +64,8 @@ def write_f1_run(snapshot: Snapshot, result: Mapping, directory: str | Path) -> 
     for table in TABLES:
         contents[f"{table}.jsonl"] = b"".join(
             _json(dict(run_id=run_id, **row)) + b"\n" for row in result[table])
-    schema = REBALANCE_SCHEMA_VERSION if manifest.get("schema_version") == 3 else SCHEMA_VERSION
+    schema = (CONTINUOUS_SCHEMA_VERSION if manifest.get("schema_version") == 4 else
+              REBALANCE_SCHEMA_VERSION if manifest.get("schema_version") == 3 else SCHEMA_VERSION)
     envelope = dict(artifact_schema_version=schema, run=manifest,
                     files={name: sha256(contents[name]).hexdigest() for name in FILES})
     contents["manifest.json"] = _json(envelope) + b"\n"
@@ -94,11 +96,13 @@ def replay_f1(directory: str | Path) -> dict:
     root = Path(directory)
     try:
         envelope = _load_json((root / "manifest.json").read_bytes(), "manifest.json")
-        if envelope["artifact_schema_version"] not in (SCHEMA_VERSION, REBALANCE_SCHEMA_VERSION) or set(envelope["files"]) != set(FILES):
+        if envelope["artifact_schema_version"] not in (SCHEMA_VERSION, REBALANCE_SCHEMA_VERSION,
+                                                         CONTINUOUS_SCHEMA_VERSION) or set(envelope["files"]) != set(FILES):
             raise ReplayError("manifest: unsupported schema or file set")
         run = envelope["run"]
         _require(envelope["artifact_schema_version"],
-                 REBALANCE_SCHEMA_VERSION if run["schema_version"] == 3 else SCHEMA_VERSION,
+                 (CONTINUOUS_SCHEMA_VERSION if run["schema_version"] == 4 else
+                  REBALANCE_SCHEMA_VERSION if run["schema_version"] == 3 else SCHEMA_VERSION),
                  "artifact schema")
         run_id = run["run_id"]
         identity = dict(run)
@@ -137,11 +141,17 @@ def _reconstruct(snapshot, run, tables):
     expected_days = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
                      if datetime.fromisoformat(s["open_at"].replace("Z", "+00:00")) > decision]
     expiry = int(run["config"]["expiry_sessions"])
-    if run["schema_version"] == 3:
+    if run["schema_version"] in (3, 4):
         second_decision = datetime.fromisoformat(run["second_decision_at"].replace("Z", "+00:00"))
         second_days = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
                        if datetime.fromisoformat(s["open_at"].replace("Z", "+00:00")) > second_decision][:expiry]
-        expected = expected_days[:expiry] + [run["second_formation_session"]] + second_days
+        if run["schema_version"] == 4:
+            bridge = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
+                      if expected_days[expiry - 1] < s["session"] <= run["second_formation_session"]]
+            _require(run["bridge_sessions"], bridge, "bridge sessions")
+        else:
+            bridge = [run["second_formation_session"]]
+        expected = expected_days[:expiry] + bridge + second_days
         _require(run["decision_windows"][0]["execution_sessions"], expected_days[:expiry], "first window")
         _require(run["decision_windows"][1]["execution_sessions"], second_days, "second window")
         _require(run["decision_windows"][1]["formation_session"], run["second_formation_session"], "second formation")

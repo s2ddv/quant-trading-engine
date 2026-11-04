@@ -41,15 +41,17 @@ class RebalanceTests(unittest.TestCase):
                          (Decimal("3095.35"), Decimal("2328.49"), Decimal("766.86")))
         self.assertEqual([f["cash_debit"] for f in fills[1:]],
                          list(map(Decimal, ("217.33", "192.29", "198.30", "2829.24"))))
-        self.assertEqual(result["nav"][3]["nav_brl"], Decimal("100765.01"))
-        self.assertEqual((result["nav"][4]["cash_brl"], result["nav"][4]["positions_value_brl"],
-                          result["nav"][4]["nav_brl"]),
+        formation = next(row for row in result["nav"] if row["session"] == "2025-02-28")
+        execution = next(row for row in result["nav"] if row["session"] == "2025-03-03")
+        self.assertEqual(formation["nav_brl"], Decimal("100765.01"))
+        self.assertEqual((execution["cash_brl"], execution["positions_value_brl"],
+                          execution["nav_brl"]),
                          (Decimal("50432.20"), Decimal("50323.00"), Decimal("100755.20")))
         basis = {e["instrument_id"]: e["cost_basis"] for e in result["ledger"]}
         self.assertEqual(basis, dict(zip(
             ("SYN-001", "SYN-002", "SYN-003", "SYN-004", "SYN-005"),
             map(Decimal, ("7556.32", "10090.12", "10063.08", "10080.11", "12704.03")))))
-        self.assertEqual({ident: mark["quantity"] for ident, mark in result["nav"][4]["marks"].items()},
+        self.assertEqual({ident: mark["quantity"] for ident, mark in execution["marks"].items()},
                          {"SYN-001": 503, "SYN-002": 325, "SYN-003": 314,
                           "SYN-004": 305, "SYN-005": 403})
         self.assertEqual(sum(f["spread_cost"] + f["slippage_cost"] + f["fees"] for f in fills), Decimal("9.81"))
@@ -79,7 +81,8 @@ class RebalanceTests(unittest.TestCase):
     def test_suspended_sale_does_not_fund_buys(self):
         config = replace(F1Config(), max_name_weight=Decimal("0.20"))
         baseline = self.run_case(config)
-        self.assertEqual(baseline["nav"][3]["cash_brl"], Decimal("1388.29"))
+        self.assertEqual(next(row for row in baseline["nav"] if row["session"] == "2025-02-28")["cash_brl"],
+                         Decimal("1388.29"))
         for event in self.payload["opens"]:
             if event["instrument_id"] == "SYN-001" and event["session"] >= "2025-03-03":
                 event["tradable"] = False
