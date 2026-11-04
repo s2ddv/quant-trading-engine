@@ -10,6 +10,22 @@ Contratos incluídos: `PriceBar` bruto, `OpenEvent`, `CorporateAction`, `Univers
 
 As fixtures F0 em `examples/` são pequenas e controladas. A F1 acrescenta `synthetic_f1_v1.json`, com 14 meses e cinco instrumentos fictícios. `qtre.universe.listed_members` reconstrói membros datados; `qtre.signals.momentum_12_2` aplica o corte de disponibilidade e calcula o score. `qtre.backtest.run_f1` demonstra uma formação mensal, ordens para a abertura seguinte, fills com custos hipotéticos, split, dividendo, suspensão, livro e NAV. O [contrato sintético da F1](docs/contrato-f1-sintetico.md) fixa entradas e valores esperados. Isto verifica a mecânica do software; não mede desempenho de ações brasileiras.
 
+`qtre.reporting.write_f1_run` grava uma execução em diretório novo escolhido pelo chamador; `qtre.reporting.replay_f1` valida hashes e reconstrói caixa, posições, recebíveis e NAV lendo apenas os arquivos, sem executar `run_f1`. O [esquema dos artefatos F1](docs/artefatos-f1-v1.md) descreve formato, limites e conciliação. Exemplo sintético:
+
+```python
+from datetime import datetime, timezone
+from qtre.backtest import run_f1
+from qtre.data.snapshot import load_snapshot
+from qtre.reporting import write_f1_run, replay_f1
+
+snapshot = load_snapshot("examples/synthetic_f1_v1.json")
+result = run_f1(snapshot, decision_at=datetime(2025, 1, 31, 20, 7, tzinfo=timezone.utc))
+write_f1_run(snapshot, result, "/tmp/qtre-f1-example")
+reconstructed = replay_f1("/tmp/qtre-f1-example")
+```
+
+Escolha outro diretório quando o anterior já existir: a gravação recusa substituição silenciosa.
+
 ## Executar a validação
 
 Requer Python 3.10+; o núcleo e a suíte de testes usam apenas a biblioteca padrão. A consulta real é uma dependência opcional.
@@ -21,7 +37,7 @@ PYTHONPATH=src python3 -c 'from qtre import load_snapshot; print(load_snapshot("
 
 Para regenerar as fixtures: `python3 examples/generate_fixtures.py` e `python3 examples/generate_f1_fixture.py`. Cada script sobrescreve somente seus próprios arquivos JSON sintéticos em `examples/`.
 
-A fixture F1 grava um registro por linha para facilitar revisão sem alterar seu conteúdo canônico. Veja a [revisão de 04/11/2026](docs/revisao-f1-2026-11-04.md) para falhas corrigidas, evidências e limites pendentes. A F1 ainda não possui rebalanceamentos sucessivos, vendas, artefatos persistidos ou replay independente.
+A fixture F1 grava um registro por linha para facilitar revisão sem alterar seu conteúdo canônico. Veja a [revisão de 04/11/2026](docs/revisao-f1-2026-11-04.md) para falhas corrigidas anteriormente. A F1 ainda não possui rebalanceamentos sucessivos ou vendas.
 
 O hash identifica o conteúdo validado do snapshot. Ele não demonstra autenticidade de fornecedor, licença de dados, calendário oficial ou ausência de viés; esses pontos pertencem às fases F3/F4.
 

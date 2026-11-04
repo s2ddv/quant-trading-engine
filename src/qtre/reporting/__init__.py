@@ -1,8 +1,8 @@
 """Versioned F1 artifacts and independent synthetic book replay."""
 
 from collections.abc import Mapping
-from datetime import datetime, timezone
-from decimal import Context, Decimal, ROUND_HALF_UP, localcontext
+from datetime import datetime, timedelta, timezone
+from decimal import Context, Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -117,8 +117,11 @@ def replay_f1(directory: str | Path) -> dict:
     except (KeyError, TypeError, AttributeError, IndexError) as exc:
         raise ReplayError(f"invalid artifact structure: {exc}") from exc
 
-    with localcontext(Context(prec=28)):
-        return _reconstruct(snapshot, run, tables)
+    try:
+        with localcontext(Context(prec=28)):
+            return _reconstruct(snapshot, run, tables)
+    except (InvalidOperation, StopIteration, KeyError, TypeError, IndexError) as exc:
+        raise ReplayError(f"invalid replay event: {exc}") from exc
 
 
 def _reconstruct(snapshot, run, tables):
@@ -159,8 +162,10 @@ def _reconstruct(snapshot, run, tables):
             opening = next(o for o in snapshot.available("opens", datetime.fromisoformat(open_at.replace("Z", "+00:00")))
                            if o["instrument_id"] == ident and o["session"] == day)
             _require(fill["reference_price"], str(opening["open_price"]), "opening price")
-            _require(fill["input_available_at"], opening["available_at"], "opening availability")
-            _require(fill["executed_at"], open_at, "fill time")
+            _require(datetime.fromisoformat(fill["input_available_at"].replace("Z", "+00:00")),
+                     datetime.fromisoformat(opening["available_at"].replace("Z", "+00:00")), "opening availability")
+            _require(datetime.fromisoformat(fill["executed_at"].replace("Z", "+00:00")),
+                     datetime.fromisoformat(open_at.replace("Z", "+00:00")), "fill time")
             quantity = fill["quantity"]
             if type(quantity) is not int or quantity <= 0:
                 raise ReplayError("fill quantity must be a positive integer")
@@ -233,8 +238,8 @@ def _reconstruct(snapshot, run, tables):
     for row in tables["nav"]:
         day = row["session"]
         close = datetime.fromisoformat(calendar[day]["close_at"].replace("Z", "+00:00"))
-        from datetime import timedelta
-        _require(row["valued_at"], (close + timedelta(minutes=int(run["config"]["mark_delay_minutes"]))).isoformat().replace("+00:00", "Z"), "NAV time")
+        _require(datetime.fromisoformat(row["valued_at"].replace("Z", "+00:00")),
+                 close + timedelta(minutes=int(run["config"]["mark_delay_minutes"])), "NAV time")
         for entry in (e for e in tables["ledger"] if e["session"] == day):
             ident, kind, event_id = entry["instrument_id"], entry["kind"], entry["event_id"]
             if kind == "buy":
