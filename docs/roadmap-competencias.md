@@ -26,7 +26,7 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 2. **Inspecionar antes de alterar.** Conferir branch, alterações locais, especificação e interfaces dos projetos relacionados. Preservar trabalho não versionado e evitar mudanças em repositórios vizinhos sem necessidade explícita.
 3. **Testar causalidade e contabilidade primeiro.** Fixtures pequenas com resposta calculada à mão; testes adversos para dado futuro, suspensão, preço ausente, split e dividendo. Testes estatísticos entram depois que o motor econômico estiver correto.
 4. **Guardar evidência de cada execução.** Registrar versão do código, hash do snapshot, configuração, seed, calendário, custos e resultado. Relatar separadamente teste sintético, replay e qualquer avaliação com dados reais.
-5. **Revisar cada marco.** Conferir diff, rodar testes relevantes, comparar a saída com o aceite e atualizar documentação de limitações. Só então avançar para a fase seguinte. Não alterar parâmetros após consultar o teste final sem registrar uma nova hipótese.
+5. **Revisar e versionar cada marco.** Conferir diff, rodar testes relevantes, comparar a saída com o aceite e atualizar documentação de limitações. Fazer commits periódicos e coesos usando a skill `commit`, após conferir exatamente o que será incluído; informar os hashes e manter push separado. Só então avançar para a fase seguinte. Não alterar parâmetros após consultar o teste final sem registrar uma nova hipótese.
 
 **Fora do escopo imediato:** corretora e ordens reais, previsão por ML, múltiplas estratégias e afirmações de desempenho B3. Essas ideias só entram se acrescentarem evidência à pergunta de pesquisa depois do primeiro backtest auditável.
 
