@@ -253,3 +253,6 @@ def _run(snapshot, decision_at, config, formation_session):
     manifest["run_id"] = sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return dict(manifest=manifest, signals=signals, orders=orders, order_states=tuple(states.values()),
                 portfolio_reason=portfolio_reason, fills=tuple(fills), ledger=tuple(book.ledger), nav=tuple(nav))
+
+
+from .rebalance import run_f1_two_formations
