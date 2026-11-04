@@ -1,8 +1,8 @@
 # Quant Trading Research Engine
 
-Motor de pesquisa quantitativa para testar, futuramente, momentum cross-sectional 12–2 em ações B3. A [especificação técnica](docs/especificacao-tecnica.md) define os contratos do motor; o [plano de competências e entregas](docs/roadmap-competencias.md) organiza a evolução como projeto de portfólio. Ainda não há backtest, estratégia implementada ou resultado com dados B3.
+Motor de pesquisa quantitativa para testar, futuramente, momentum cross-sectional 12–2 em ações B3. A [especificação técnica](docs/especificacao-tecnica.md) define os contratos do motor; o [plano de competências e entregas](docs/roadmap-competencias.md) organiza a evolução como projeto de portfólio. Há um protótipo sintético de sinal, execução e contabilidade e uma sondagem exploratória via yfinance. Ainda não há backtest validado com dados B3.
 
-## Estado: F1 — corte vertical sintético
+## Estado: F1 parcial — uma formação sintética
 
 O parser em `src/qtre/data/snapshot.py` valida snapshots JSON de esquema `1` e calcula SHA-256 dos bytes JSON canônicos (chaves ordenadas, sem espaços). Entradas com o mesmo conteúdo produzem o mesmo hash. Os registros são congelados após a leitura. O calendário é uma lista explícita de sessões sintéticas no fuso `America/Sao_Paulo`; seus horários UTC não representam um calendário oficial da B3.
 
@@ -12,7 +12,7 @@ As fixtures F0 em `examples/` são pequenas e controladas. A F1 acrescenta `synt
 
 ## Executar a validação
 
-Requer Python 3.10+; o núcleo F0 usa apenas a biblioteca padrão.
+Requer Python 3.10+; o núcleo e a suíte de testes usam apenas a biblioteca padrão. A consulta real é uma dependência opcional.
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
@@ -20,6 +20,8 @@ PYTHONPATH=src python3 -c 'from qtre import load_snapshot; print(load_snapshot("
 ```
 
 Para regenerar as fixtures: `python3 examples/generate_fixtures.py` e `python3 examples/generate_f1_fixture.py`. Cada script sobrescreve somente seus próprios arquivos JSON sintéticos em `examples/`.
+
+A fixture F1 grava um registro por linha para facilitar revisão sem alterar seu conteúdo canônico. Veja a [revisão de 04/11/2026](docs/revisao-f1-2026-11-04.md) para falhas corrigidas, evidências e limites pendentes. A F1 ainda não possui rebalanceamentos sucessivos, vendas, artefatos persistidos ou replay independente.
 
 O hash identifica o conteúdo validado do snapshot. Ele não demonstra autenticidade de fornecedor, licença de dados, calendário oficial ou ausência de viés; esses pontos pertencem às fases F3/F4.
 

@@ -1,6 +1,6 @@
 """Build a deterministic, wholly synthetic F1 clock and price history."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 import json
 from pathlib import Path
 
@@ -90,5 +90,18 @@ def build():
     return root
 
 
+def render_snapshot(payload, indent=0):
+    """Keep each record on one line while preserving the v1 JSON structure."""
+    padding = " " * indent
+    if isinstance(payload, dict):
+        entries = [" " * (indent + 2) + json.dumps(key) + ": " + render_snapshot(value, indent + 2)
+                   for key, value in sorted(payload.items())]
+        return "{\n" + ",\n".join(entries) + "\n" + padding + "}"
+    if isinstance(payload, list):
+        entries = [" " * (indent + 2) + json.dumps(row, sort_keys=True, separators=(",", ":")) for row in payload]
+        return "[\n" + ",\n".join(entries) + "\n" + padding + "]" if entries else "[]"
+    return json.dumps(payload)
+
+
 if __name__ == "__main__":
-    (HERE / "synthetic_f1_v1.json").write_text(json.dumps(build(), sort_keys=True, indent=2) + "\n")
+    (HERE / "synthetic_f1_v1.json").write_text(render_snapshot(build()) + "\n", encoding="utf-8")

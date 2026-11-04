@@ -41,7 +41,7 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 
 ## Sequência de entregas
 
-1. **F0 — base causal (em desenvolvimento local).** Consolidar parser e fixtures sintéticas já presentes; revisar os contratos de disponibilidade temporal, identidade de instrumentos e calendário. Entrega: testes e documentação executáveis. Não chamar esta etapa de backtest.
+1. **F0 — base causal consolidada e versionada.** Parser e fixtures sintéticas preservados, com contratos de disponibilidade temporal, identidade de instrumentos e calendário testados. Esta etapa não é um backtest.
 2. **F1 — backtest vertical sintético.** Criar uma fixture com pelo menos 13 meses e 5 instrumentos; implementar universo datado, 12–2, carteira, execução na sessão seguinte, custos, ações corporativas, livro e NAV. Entrega: caso manual conciliado e trilha de cada decisão.
 3. **F2 — validação de pesquisa.** Pré-definir hipótese, parâmetros, benchmark e protocolo de seleção; separar desenvolvimento, validação e teste final. Acrescentar walk-forward quando houver histórico suficiente, controles negativos, testes de vazamento, sensibilidade a custos e relatório de todas as tentativas. Entrega: replay e auditoria causal reproduzíveis. Fixtures sintéticas demonstram o método, não desempenho B3.
 4. **F3 — integração Monte Carlo.** Consumir o `quant-simulation-framework` por adaptador opcional e versão fixada. Usar histórico de retornos e pesos do QTRE para cenários de perda, drawdown e concentração; comparar com risco realizado fora da amostra. Manter separadas as hipóteses GBM, os cenários Student-t e as métricas históricas. Entrega: cenário reproduzível com seed, parâmetros, origem dos dados e limitações.
@@ -59,4 +59,6 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 
 ## Próxima entrega concreta
 
-Finalizar a F0 local e começar a F1 com uma fixture sintética de 13+ meses, 5+ instrumentos e valores esperados calculados à mão. A implementação começa pelo corte temporal e pelo sinal; depois passa à execução e ao livro. Cada componente deve ser demonstrável antes da avaliação estatística ou de dados reais.
+A F1 atual demonstra uma formação mensal em fixture de 14 meses e cinco instrumentos, com sinal, ordens, fills e NAV conciliado. A revisão de 04/11 corrigiu erros de custos, ações corporativas e causalidade; seus casos de regressão são parte da suíte. Ainda faltam vendas e rebalanceamentos sucessivos, serialização das saídas e replay independente para concluir o motor previsto na especificação. A sondagem yfinance foi antecipada a pedido do usuário e continua exploratória, sem alimentar o backtest causal.
+
+Próxima entrega: persistir os artefatos e reconstruir o livro por replay, acrescentando vendas e repetição de rebalanceamentos com casos manuais. Nenhum resultado sintético ou de cobertura da API demonstra desempenho de ações B3. A numeração desta sequência organiza competências; para os critérios técnicos de aceite F0–F4, prevalece a tabela da especificação técnica.
