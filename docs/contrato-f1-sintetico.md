@@ -29,3 +29,5 @@ O preço de execução mantém precisão decimal; notional, taxas e lançamentos
 O [esquema de artefatos F1 v1](artefatos-f1-v1.md) agora persiste snapshot, manifesto, ordens, estados, fills, lançamentos e NAV. O replay offline refaz a contabilidade a partir dos eventos e do snapshot, verifica hashes e confronta os valores registrados; ele não recalcula sinais nem ordens. Os testes cobrem repetição de bytes, arquivo ausente ou alterado, rubricas de custo e `NAV_INCOMPLETO`.
 
 Limites desta etapa: uma única formação, três sessões de execução por padrão, liquidação imediata fictícia, taxa agregada, sem classificação histórica de tipo de ação, sem venda ou resolução de deslistagem e sem série diária completa no período de formação. O manifesto identifica snapshot, hash do código Python do pacote, versão Python, calendário, parâmetros, convenção monetária e instante. Os números são testes de mecânica, não retornos de mercado brasileiro.
+
+Uma [continuação sintética separada](contrato-f1-segunda-formacao.md) acrescenta uma venda e segunda decisão mensal. Ela usa o [esquema de artefatos 2](artefatos-f1-v2.md); os limites acima descrevem somente a primeira fixture.

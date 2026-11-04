@@ -2,7 +2,7 @@
 
 Motor de pesquisa quantitativa para testar, futuramente, momentum cross-sectional 12–2 em ações B3. A [especificação técnica](docs/especificacao-tecnica.md) define os contratos do motor; o [plano de competências e entregas](docs/roadmap-competencias.md) organiza a evolução como projeto de portfólio. Há um protótipo sintético de sinal, execução e contabilidade e uma sondagem exploratória via yfinance. Ainda não há backtest validado com dados B3.
 
-## Estado: F1 parcial — uma formação sintética
+## Estado: F1 parcial — duas formações sintéticas
 
 O parser em `src/qtre/data/snapshot.py` valida snapshots JSON de esquema `1` e calcula SHA-256 dos bytes JSON canônicos (chaves ordenadas, sem espaços). Entradas com o mesmo conteúdo produzem o mesmo hash. Os registros são congelados após a leitura. O calendário é uma lista explícita de sessões sintéticas no fuso `America/Sao_Paulo`; seus horários UTC não representam um calendário oficial da B3.
 
@@ -24,6 +24,19 @@ write_f1_run(snapshot, result, "/tmp/qtre-f1-example")
 reconstructed = replay_f1("/tmp/qtre-f1-example")
 ```
 
+A [segunda formação sintética](docs/contrato-f1-segunda-formacao.md) acrescenta
+uma venda, compras após a venda e NAV conciliado. `run_f1_two_formations`
+executa as decisões de 31/01 e 28/02 na fixture
+`synthetic_f1_rebalance_v1.json`; os artefatos usam o
+[esquema 2](docs/artefatos-f1-v2.md) e o mesmo `replay_f1` os reconstrói sem
+executar o motor. Este é um exemplo de duas decisões, ainda sem ciclo mensal
+geral.
+
+Para reproduzir a continuação, use `run_f1_two_formations(snapshot,
+first_decision_at=..., second_decision_at=...)` com as datas do
+[exemplo manual](docs/contrato-f1-segunda-formacao.md), depois passe seu
+resultado a `write_f1_run` e o diretório criado a `replay_f1`.
+
 Escolha outro diretório quando o anterior já existir: a gravação recusa substituição silenciosa.
 
 ## Executar a validação
@@ -35,9 +48,9 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 PYTHONPATH=src python3 -c 'from qtre import load_snapshot; print(load_snapshot("examples/synthetic_normal_v1.json").content_hash)'
 ```
 
-Para regenerar as fixtures: `python3 examples/generate_fixtures.py` e `python3 examples/generate_f1_fixture.py`. Cada script sobrescreve somente seus próprios arquivos JSON sintéticos em `examples/`.
+Para regenerar as fixtures: `python3 examples/generate_fixtures.py`, `python3 examples/generate_f1_fixture.py` e `python3 examples/generate_f1_rebalance_fixture.py`. Cada script sobrescreve somente seus próprios arquivos JSON sintéticos em `examples/`.
 
-A fixture F1 grava um registro por linha para facilitar revisão sem alterar seu conteúdo canônico. Veja a [revisão de 04/11/2026](docs/revisao-f1-2026-11-04.md) para falhas corrigidas anteriormente. A F1 ainda não possui rebalanceamentos sucessivos ou vendas.
+A fixture F1 grava um registro por linha para facilitar revisão sem alterar seu conteúdo canônico. Veja a [revisão de 04/11/2026](docs/revisao-f1-2026-11-04.md) para falhas corrigidas anteriormente. A F1 agora demonstra uma venda e uma segunda decisão sintética, mas ainda não possui repetição mensal geral.
 
 O hash identifica o conteúdo validado do snapshot. Ele não demonstra autenticidade de fornecedor, licença de dados, calendário oficial ou ausência de viés; esses pontos pertencem às fases F3/F4.
 

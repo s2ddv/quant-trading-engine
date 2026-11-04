@@ -106,6 +106,8 @@ Cada execução recebe `run_id` derivado de configuração canônica, código/co
 
 **Implementação parcial da persistência F1 sintética (04/11/2026):** o [esquema de artefatos v1](artefatos-f1-v1.md) fixa `snapshot.json`, `manifest.json`, `orders.jsonl`, `order_states.jsonl`, `fills.jsonl`, `ledger.jsonl` e `nav.jsonl`. O replay lê esses arquivos, verifica os hashes e reconstrói livro e NAV sem invocar o motor. As demais saídas propostas acima, incluindo sinais e métricas, continuam fora deste corte. O `run_id` existente combina parâmetros, modelo, código, Python e hash do snapshot; os hashes dos artefatos ficam no envelope do manifesto.
 
+**Continuação F1:** a [segunda formação sintética](contrato-f1-segunda-formacao.md) usa o [esquema de artefatos v2](artefatos-f1-v2.md) para venda, base removida e lucro realizado. O replay independente aceita v1 e v2. A continuidade mensal geral, ações corporativas no intervalo entre formações e validação de pesquisa permanecem pendentes.
+
 Um ID de consulta ou URL de fornecedor não congela dados. Se a licença impedir armazenar o snapshot, registrar hash, intervalo, versão, método e data de extração, mas declarar que terceiros **não conseguem reproduzir exatamente** sem acesso ao mesmo conteúdo. Revisões do fornecedor, ajustes retroativos e mudança de calendário podem alterar resultados; um novo snapshot vira outro `run_id`.
 
 ## 8. Integração sem duplicação

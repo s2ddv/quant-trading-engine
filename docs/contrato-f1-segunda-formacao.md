@@ -1,6 +1,8 @@
 # F1 sintética: segunda decisão e venda — exemplo manual
 
 Continuação de `synthetic_f1_v1.json`, com sessões sintéticas até 05/03/2025.
+O snapshot `synthetic_f1_rebalance_v1.json` tem SHA-256 canônico
+`2f6eee2938b1b3899f45d0e1893412fe12f209d78a3fb7e755472bfe6e5005df`.
 A primeira decisão é 31/01 às 20:07 UTC e conserva os resultados do contrato
 anterior. A segunda é 28/02 às 20:07 UTC, após barras publicadas às 20:05;
 suas ordens só podem executar a partir da abertura de 03/03 às 13:00 UTC.
