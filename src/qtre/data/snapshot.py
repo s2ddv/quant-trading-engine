@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
+from functools import lru_cache
 import json
 from pathlib import Path
 from types import MappingProxyType
@@ -56,6 +57,11 @@ def _date(value: Any, path: str) -> date:
 def _instant(value: Any, path: str) -> datetime:
     if not isinstance(value, str):
         _fail(path, "expected ISO timestamp with timezone")
+    return _parse_instant(value, path)
+
+
+@lru_cache(maxsize=65536)
+def _parse_instant(value: str, path: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
