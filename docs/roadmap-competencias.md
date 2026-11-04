@@ -12,9 +12,10 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 
 | Horizonte | Meta | Critério de conclusão |
 |---|---|---|
-| Agora | Preservar e consolidar a F0 local | Contratos e fixtures documentados, testes verdes e estado Git compreendido antes de versionar |
-| Próxima entrega | Fazer o primeiro corte vertical sintético da F1 | Cinco ou mais instrumentos, 13+ meses, sinal manualmente verificável, ordens só após decisão e caixa/NAV conciliados |
-| Depois | Tornar o backtest auditável | Replay determinístico, manifesto, teste de vazamento, custos e eventos corporativos demonstrados em fixtures adversas |
+| Concluído | Consolidar a F0 e demonstrar uma formação sintética da F1 | Contratos versionados; fixture de 14 meses e cinco instrumentos; sinal manual, execução posterior, custos e NAV testados |
+| Concluído | Persistir a execução e reconstruir o livro por replay independente | Esquema 1, manifesto e hashes; replay offline reproduz caixa, posições, recebíveis e NAV; adulteração é detectada nos testes |
+| Agora | Demonstrar uma venda e o segundo rebalanceamento sintético | Alvos baseados no patrimônio disponível, venda antes de compra, caixa e base de custo conciliados em valores manuais, ordens causais |
+| Depois | Generalizar ciclos mensais de carteira | Rebalanceamentos sucessivos, lotes, custos, eventos corporativos e replay compatível com o novo esquema |
 | Pesquisa | Avaliar robustez em vez de maximizar uma métrica | Protocolo pré-definido, baselines, separação temporal, todas as tentativas registradas e sensibilidade a custos |
 | Integração | Reusar Monte Carlo como laboratório de risco | Adaptador opcional, parâmetros e seed registrados, cenários comparados com risco histórico |
 | Publicação | Produzir um caso de portfólio defensável | Fonte de dados e direitos auditados, relatório líquido fora da amostra, limites explícitos e instruções de reprodução |
@@ -42,7 +43,7 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 ## Sequência de entregas
 
 1. **F0 — base causal consolidada e versionada.** Parser e fixtures sintéticas preservados, com contratos de disponibilidade temporal, identidade de instrumentos e calendário testados. Esta etapa não é um backtest.
-2. **F1 — backtest vertical sintético.** Criar uma fixture com pelo menos 13 meses e 5 instrumentos; implementar universo datado, 12–2, carteira, execução na sessão seguinte, custos, ações corporativas, livro e NAV. Entrega: caso manual conciliado e trilha de cada decisão.
+2. **F1 — backtest vertical sintético (parcial).** A fixture de 14 meses e cinco instrumentos, o universo datado, o 12–2, uma formação com compras, custos, split, dividendo, livro e NAV, mais artefatos persistidos com replay independente já existem. Restam vendas e rebalanceamentos sucessivos para fechar o motor mensal e sua trilha de decisão.
 3. **F2 — validação de pesquisa.** Pré-definir hipótese, parâmetros, benchmark e protocolo de seleção; separar desenvolvimento, validação e teste final. Acrescentar walk-forward quando houver histórico suficiente, controles negativos, testes de vazamento, sensibilidade a custos e relatório de todas as tentativas. Entrega: replay e auditoria causal reproduzíveis. Fixtures sintéticas demonstram o método, não desempenho B3.
 4. **F3 — integração Monte Carlo.** Consumir o `quant-simulation-framework` por adaptador opcional e versão fixada. Usar histórico de retornos e pesos do QTRE para cenários de perda, drawdown e concentração; comparar com risco realizado fora da amostra. Manter separadas as hipóteses GBM, os cenários Student-t e as métricas históricas. Entrega: cenário reproduzível com seed, parâmetros, origem dos dados e limitações.
 5. **F4 — dados brasileiros auditados.** Só introduzir barras, eventos, universo histórico e benchmark reais após verificar licença, cobertura, deslistados, correções e timestamps de disponibilidade. Entrega: relatório de qualidade de dados e rótulos explícitos para qualquer viés remanescente.
@@ -59,6 +60,8 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 
 ## Próxima entrega concreta
 
-A F1 atual demonstra uma formação mensal em fixture de 14 meses e cinco instrumentos, com sinal, ordens, fills e NAV conciliado. A revisão de 04/11 corrigiu erros de custos, ações corporativas e causalidade; seus casos de regressão são parte da suíte. Ainda faltam vendas e rebalanceamentos sucessivos, serialização das saídas e replay independente para concluir o motor previsto na especificação. A sondagem yfinance foi antecipada a pedido do usuário e continua exploratória, sem alimentar o backtest causal.
+A F1 atual demonstra uma formação mensal em fixture de 14 meses e cinco instrumentos, com sinal, ordens, fills e NAV conciliado. A revisão de 04/11 corrigiu erros de custos, ações corporativas e causalidade; seus casos de regressão são parte da suíte. Os commits locais `41811cc` e `2b3b70f` acrescentaram persistência, documentação e replay do livro no esquema 1. Em 04/11, o checkout `main` estava em `2b3b70f`, dois commits à frente de `origin/main`, e os 49 testes locais passaram. A sondagem yfinance continua exploratória e não alimenta o backtest causal.
 
-Próxima entrega: persistir os artefatos e reconstruir o livro por replay, acrescentando vendas e repetição de rebalanceamentos com casos manuais. Nenhum resultado sintético ou de cobertura da API demonstra desempenho de ações B3. A numeração desta sequência organiza competências; para os critérios técnicos de aceite F0–F4, prevalece a tabela da especificação técnica.
+**Próximo marco — venda e segundo rebalanceamento:** criar uma fixture sintética curta de continuação, com uma segunda decisão mensal que reduza ou zere uma posição e compre outra. Definir primeiro os valores esperados de quantidades, caixa, base de custo, custos de venda, posições e NAV. A ordem de processamento deve impedir que uma compra use recursos de venda ainda não executada; dados e preços posteriores à decisão não podem alterar os alvos já emitidos. Testar lote, caixa insuficiente, suspensão, fill parcial e conservação da base de custo. Atualizar o contrato de artefatos por nova versão de esquema se os novos tipos de evento não couberem no esquema 1; manter replay independente para o novo fluxo.
+
+Depois desse marco, generalizar a repetição mensal e avançar à validação F2. Nenhum resultado sintético ou de cobertura da API demonstra desempenho de ações B3. A numeração desta sequência organiza competências; para os critérios técnicos de aceite F0–F4, prevalece a tabela da especificação técnica.
