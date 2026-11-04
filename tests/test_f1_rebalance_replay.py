@@ -78,6 +78,42 @@ class RebalanceReplayTests(unittest.TestCase):
         rebuilt = replay_f1(path)
         self.assertEqual(rebuilt["positions"]["SYN-001"], 508)
 
+    def test_unpaid_dividend_crosses_formation_and_pays_before_trades(self):
+        payload = json.loads(FIXTURE.read_text())
+        dividend = next(a for a in payload["actions"] if a["action_id"] == "SYN-DIV")
+        dividend["pay_session"] = "2025-03-03"
+        snapshot = parse_snapshot(payload)
+        result = run_f1_two_formations(snapshot, first_decision_at=FIRST,
+                                       second_decision_at=SECOND)
+        self.assertEqual(result["nav"][2]["cash_brl"], Decimal("50615.01"))
+        self.assertEqual(result["nav"][2]["receivable_brl"], Decimal("159.00"))
+        self.assertEqual(result["nav"][3]["nav_brl"], Decimal("100765.01"))
+        self.assertEqual(result["nav"][3]["receivable_brl"], Decimal("159.00"))
+        second_events = [row for row in result["ledger"] if row["session"] == "2025-03-03"]
+        self.assertEqual((second_events[0]["kind"], second_events[0]["cash_delta"]),
+                         ("dividend_pay", Decimal("159.00")))
+        path = write_f1_run(snapshot, result, Path(self.temp.name) / "delayed-dividend")
+        with patch("qtre.backtest.run_f1", side_effect=AssertionError("engine called")):
+            rebuilt = replay_f1(path)
+        self.assertEqual(rebuilt["cash_brl"], Decimal("50432.20"))
+        self.assertEqual(rebuilt["receivables"], {})
+        self.assertEqual(rebuilt["nav"][3]["receivable_brl"], "159.00")
+
+    def test_unpaid_dividend_does_not_become_early_cash(self):
+        payload = json.loads(FIXTURE.read_text())
+        next(a for a in payload["actions"] if a["action_id"] == "SYN-DIV")["pay_session"] = "2025-03-05"
+        snapshot = parse_snapshot(payload)
+        result = run_f1_two_formations(snapshot, first_decision_at=FIRST,
+                                       second_decision_at=SECOND)
+        self.assertEqual(result["nav"][4]["receivable_brl"], Decimal("159.00"))
+        self.assertFalse(any(row["kind"] == "dividend_pay" and row["session"] < "2025-03-05"
+                             for row in result["ledger"]))
+        self.assertEqual(result["nav"][-1]["receivable_brl"], Decimal(0))
+        path = write_f1_run(snapshot, result, Path(self.temp.name) / "late-payment")
+        rebuilt = replay_f1(path)
+        self.assertEqual(rebuilt["nav"][4]["receivable_brl"], "159.00")
+        self.assertEqual(rebuilt["receivables"], {})
+
 
 if __name__ == "__main__":
     unittest.main()

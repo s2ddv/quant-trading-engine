@@ -76,8 +76,8 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
         raise ValueError("second formation must be in the next calendar month")
     if day <= first["nav"][-1]["session"]:
         raise ValueError("second formation overlaps the first execution window")
-    if first["nav"][-1]["status"] != "COMPLETE" or first["nav"][-1]["receivable_brl"]:
-        raise ValueError("second formation requires a complete, settled opening book")
+    if first["nav"][-1]["status"] != "COMPLETE":
+        raise ValueError("second formation requires a complete opening NAV")
 
     # This cut does not silently skip corporate actions between the two windows.
     for action in snapshot.available("actions", second_decision_at):
@@ -96,6 +96,16 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
     book = _Book(first["nav"][-1]["cash_brl"])
     book.positions = {ident: row["quantity"] for ident, row in last_by_ident.items() if row["quantity"]}
     book.cost_basis = {ident: row["cost_basis"] for ident, row in last_by_ident.items() if row["quantity"]}
+    actions_by_id = {action["action_id"]: action for action in snapshot.available("actions", second_decision_at)}
+    unpaid = {row["event_id"]: row for row in first["ledger"] if row["kind"] == "dividend_ex"}
+    for row in first["ledger"]:
+        if row["kind"] == "dividend_pay":
+            unpaid.pop(row["event_id"].removesuffix("-pay"), None)
+    book.receivables = {action_id: money(Decimal(row["quantity"]) *
+                                         Decimal(str(actions_by_id[action_id]["cash_per_share"])))
+                        for action_id, row in unpaid.items()}
+    if sum(book.receivables.values(), Decimal(0)) != first["nav"][-1]["receivable_brl"]:
+        raise ValueError("opening receivables do not reconcile")
     formed_at = instant(formation["close_at"]) + timedelta(minutes=config.mark_delay_minutes)
     if formed_at > second_decision_at:
         raise ValueError("second decision precedes formation mark")
