@@ -15,6 +15,6 @@ de 318 ações de SYN-002 em 04/02 gera R$ 159,00 a receber (`318 × 0,50`).
 O pagamento altera caixa e recebível em igual magnitude, sem criar retorno.
 Antes de 03/03, o valor a receber compõe o NAV, mas não financia ordens. O
 replay deve reconstruir cada saldo a partir do dividendo e do pagamento
-persistidos, sem executar novamente o motor. Uma ação corporativa cuja ex-data
-ocorra entre as janelas de execução continua fora deste incremento: exige
-processamento e marcação contínuos das sessões intermediárias.
+persistidos, sem executar novamente o motor. O incremento seguinte registra
+as [sessões intermediárias](contrato-f1-sessoes-intermediarias.md), inclusive
+ações corporativas com ex-data entre as janelas.

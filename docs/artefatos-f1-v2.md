@@ -1,4 +1,4 @@
-# Artefatos F1 — esquema 2 para segunda formação
+# Artefatos F1 — esquema 2 para segunda formação (histórico)
 
 O esquema 2 conserva os sete arquivos e a serialização do
 [esquema 1](artefatos-f1-v1.md). `manifest.json` traz
@@ -30,8 +30,9 @@ data de pagamento, inclusive quando ela cai na segunda janela. O recebível
 integra o NAV sem compor o caixa disponível para compras. O replay reconstrói
 o pagamento com os mesmos eventos; não foi necessário mudar o esquema. O
 [exemplo manual](contrato-f1-recebivel-entre-formacoes.md) fixa os saldos.
-Ações corporativas com ex-data entre 05/02 e 28/02 ainda são rejeitadas,
-pois exigem processamento contínuo das sessões intermediárias. Suspensão
+Ações corporativas com ex-data entre 05/02 e 28/02 eram rejeitadas nesta
+versão; o [esquema 3](artefatos-f1-v3.md) registra as sessões intermediárias.
+Suspensão
 durante a janela bloqueia fill, saldo de ordem vence após três sessões e
 eventos corporativos na janela usam as regras existentes. Não há vendas reais,
 liquidação B3, custos observados ou autenticação externa do manifesto. Sinais
