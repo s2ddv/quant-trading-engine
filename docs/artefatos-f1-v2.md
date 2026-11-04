@@ -25,8 +25,13 @@ caixa, base e NAV a partir do snapshot e dos eventos; verifica calendário,
 lotes, capacidade, negociação permitida e que nenhuma compra use caixa futuro.
 
 O esquema 2 demonstra duas decisões, não um laço mensal geral. A continuação
-exige livro completo e liquidado em 05/02; ações corporativas entre essa data
-e 28/02 são rejeitadas explicitamente, pois exigem livro contínuo. Suspensão
+exige NAV completo em 05/02, mas agora conserva dividendos a receber até a
+data de pagamento, inclusive quando ela cai na segunda janela. O recebível
+integra o NAV sem compor o caixa disponível para compras. O replay reconstrói
+o pagamento com os mesmos eventos; não foi necessário mudar o esquema. O
+[exemplo manual](contrato-f1-recebivel-entre-formacoes.md) fixa os saldos.
+Ações corporativas com ex-data entre 05/02 e 28/02 ainda são rejeitadas,
+pois exigem processamento contínuo das sessões intermediárias. Suspensão
 durante a janela bloqueia fill, saldo de ordem vence após três sessões e
 eventos corporativos na janela usam as regras existentes. Não há vendas reais,
 liquidação B3, custos observados ou autenticação externa do manifesto. Sinais
