@@ -6,6 +6,7 @@ from pathlib import Path
 import unittest
 
 from qtre.data.snapshot import load_snapshot, parse_snapshot
+from qtre.backtest import run_f1
 from qtre.signals import momentum_12_2
 from qtre.universe import listed_members
 
@@ -35,6 +36,9 @@ class F1SignalTests(unittest.TestCase):
                 bar["open"] = bar["high"] = bar["low"] = bar["close"] = 999
         after = momentum_12_2(parse_snapshot(changed), decision_at=DECISION)
         self.assertEqual(before, after)
+        before_orders = run_f1(parse_snapshot(self.payload), decision_at=DECISION)["orders"]
+        after_orders = run_f1(parse_snapshot(changed), decision_at=DECISION)["orders"]
+        self.assertEqual(before_orders, after_orders)
 
     def test_excluded_month_jump_does_not_change_score(self):
         before = momentum_12_2(parse_snapshot(self.payload), decision_at=DECISION)[0].score
@@ -52,6 +56,11 @@ class F1SignalTests(unittest.TestCase):
         member["ingested_at"] = "2025-02-01T00:01:00Z"
         snapshot = parse_snapshot(changed)
         self.assertNotIn(member["instrument_id"], listed_members(snapshot, "2025-01-31", as_of=DECISION))
+
+    def test_rejects_midmonth_formation(self):
+        with self.assertRaisesRegex(ValueError, "last session"):
+            momentum_12_2(parse_snapshot(self.payload),
+                          decision_at=datetime(2025, 1, 15, 20, 7, tzinfo=timezone.utc))
 
 
 if __name__ == "__main__":

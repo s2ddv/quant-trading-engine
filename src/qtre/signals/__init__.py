@@ -27,6 +27,9 @@ def momentum_12_2(snapshot: Snapshot, *, decision_at: datetime) -> tuple[Signal,
     if not past:
         raise ValueError("decision precedes every complete session")
     formation = past[-1]["session"]
+    next_session = next((row["session"] for row in sessions if row["session"] > formation), None)
+    if next_session is None or next_session[:7] == formation[:7]:
+        raise ValueError("decision must follow the last session of a month")
     months: dict[str, str] = {}
     for row in past:
         months[row["session"][:7]] = row["session"]

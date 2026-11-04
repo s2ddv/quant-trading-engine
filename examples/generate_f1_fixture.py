@@ -50,6 +50,10 @@ def build():
                 close = 12.0 + index - 1
             elif d.year == 2025 and d.month == 1:
                 close = 30.0 + index - 1
+            elif d == date(2025, 2, 3):
+                close = 30.0 + index - 1
+            elif d >= date(2025, 2, 4):
+                close = (30.0 + index - 1) / (2 if index == 1 else 1)
             else:
                 close = round(10.0 + index - 1 + (d - initial).days / 400, 2)
             if index == 1 and d.year == 2024 and d.month == 1:
