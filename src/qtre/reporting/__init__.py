@@ -8,11 +8,13 @@ import json
 from pathlib import Path
 
 from qtre.data.snapshot import Snapshot, load_snapshot
+from qtre.universe import listed_members
 
 
 FILES = ("snapshot.json", "orders.jsonl", "order_states.jsonl", "fills.jsonl", "ledger.jsonl", "nav.jsonl")
 TABLES = ("orders", "order_states", "fills", "ledger", "nav")
 SCHEMA_VERSION = 1
+REBALANCE_SCHEMA_VERSION = 2
 CENT = Decimal("0.01")
 
 
@@ -61,7 +63,8 @@ def write_f1_run(snapshot: Snapshot, result: Mapping, directory: str | Path) -> 
     for table in TABLES:
         contents[f"{table}.jsonl"] = b"".join(
             _json(dict(run_id=run_id, **row)) + b"\n" for row in result[table])
-    envelope = dict(artifact_schema_version=SCHEMA_VERSION, run=manifest,
+    schema = REBALANCE_SCHEMA_VERSION if manifest.get("schema_version") == 3 else SCHEMA_VERSION
+    envelope = dict(artifact_schema_version=schema, run=manifest,
                     files={name: sha256(contents[name]).hexdigest() for name in FILES})
     contents["manifest.json"] = _json(envelope) + b"\n"
     target.mkdir(parents=True, exist_ok=False)
@@ -91,9 +94,12 @@ def replay_f1(directory: str | Path) -> dict:
     root = Path(directory)
     try:
         envelope = _load_json((root / "manifest.json").read_bytes(), "manifest.json")
-        if envelope["artifact_schema_version"] != SCHEMA_VERSION or set(envelope["files"]) != set(FILES):
+        if envelope["artifact_schema_version"] not in (SCHEMA_VERSION, REBALANCE_SCHEMA_VERSION) or set(envelope["files"]) != set(FILES):
             raise ReplayError("manifest: unsupported schema or file set")
         run = envelope["run"]
+        _require(envelope["artifact_schema_version"],
+                 REBALANCE_SCHEMA_VERSION if run["schema_version"] == 3 else SCHEMA_VERSION,
+                 "artifact schema")
         run_id = run["run_id"]
         identity = dict(run)
         del identity["run_id"]
@@ -130,7 +136,18 @@ def _reconstruct(snapshot, run, tables):
     decision = datetime.fromisoformat(run["decision_at"].replace("Z", "+00:00"))
     expected_days = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
                      if datetime.fromisoformat(s["open_at"].replace("Z", "+00:00")) > decision]
-    _require(nav_days, expected_days[:int(run["config"]["expiry_sessions"])], "NAV sessions")
+    expiry = int(run["config"]["expiry_sessions"])
+    if run["schema_version"] == 3:
+        second_decision = datetime.fromisoformat(run["second_decision_at"].replace("Z", "+00:00"))
+        second_days = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
+                       if datetime.fromisoformat(s["open_at"].replace("Z", "+00:00")) > second_decision][:expiry]
+        expected = expected_days[:expiry] + [run["second_formation_session"]] + second_days
+        _require(run["decision_windows"][0]["execution_sessions"], expected_days[:expiry], "first window")
+        _require(run["decision_windows"][1]["execution_sessions"], second_days, "second window")
+        _require(run["decision_windows"][1]["formation_session"], run["second_formation_session"], "second formation")
+    else:
+        expected = expected_days[:expiry]
+    _require(nav_days, expected, "NAV sessions")
     if any(row["session"] not in nav_days for row in tables["ledger"]):
         raise ReplayError("ledger event outside NAV sessions")
     if [row["session"] for row in tables["ledger"]] != sorted(row["session"] for row in tables["ledger"]):
@@ -146,21 +163,36 @@ def _reconstruct(snapshot, run, tables):
     initial = Decimal(run["config"]["initial_cash"])
     cash, positions, bases, receivables = initial, {}, {}, {}
     seen_fills, seen_actions = set(), set()
+    buy_days = set()
     unresolved = set()
     actions = {row["action_id"]: row for row in snapshot.payload["actions"]}
     for row in tables["ledger"]:
         event_id, kind, ident, day = (row[key] for key in ("event_id", "kind", "instrument_id", "session"))
-        if kind == "buy":
+        if kind in ("buy", "sell"):
+            if kind == "sell" and day in buy_days:
+                raise ReplayError("sale recorded after a buy in the same session")
+            if kind == "buy":
+                buy_days.add(day)
             if event_id in seen_fills or event_id not in fills:
                 raise ReplayError(f"ledger: duplicate or unknown fill {event_id}")
             fill = fills[event_id]
             order = orders[fill["order_id"]]
             _require((ident, day), (fill["instrument_id"], fill["session"]), "fill identity")
-            _require((ident, order["side"]), (order["instrument_id"], "buy"), "order identity")
+            _require((ident, order["side"]), (order["instrument_id"], kind), "order identity")
+            if kind == "sell" or "side" in fill:
+                _require(fill["side"], kind, "fill side")
             _require(fill["source_key"], f"open:{ident}:{day}", "fill source")
             open_at = next(s["open_at"] for s in snapshot.payload["calendar"]["sessions"] if s["session"] == day)
             opening = next(o for o in snapshot.available("opens", datetime.fromisoformat(open_at.replace("Z", "+00:00")))
                            if o["instrument_id"] == ident and o["session"] == day)
+            if not opening["tradable"] or ident not in listed_members(
+                snapshot, day, as_of=datetime.fromisoformat(open_at.replace("Z", "+00:00"))):
+                raise ReplayError("fill during suspended or untradable opening")
+            if not (datetime.fromisoformat(order["created_at"].replace("Z", "+00:00")) <
+                    datetime.fromisoformat(open_at.replace("Z", "+00:00")) and
+                    datetime.fromisoformat(order["earliest_execution_at"].replace("Z", "+00:00")) <=
+                    datetime.fromisoformat(open_at.replace("Z", "+00:00")) and day <= order["expiry_session"]):
+                raise ReplayError("fill outside causal order window")
             _require(fill["reference_price"], str(opening["open_price"]), "opening price")
             _require(datetime.fromisoformat(fill["input_available_at"].replace("Z", "+00:00")),
                      datetime.fromisoformat(opening["available_at"].replace("Z", "+00:00")), "opening availability")
@@ -169,25 +201,45 @@ def _reconstruct(snapshot, run, tables):
             quantity = fill["quantity"]
             if type(quantity) is not int or quantity <= 0:
                 raise ReplayError("fill quantity must be a positive integer")
+            if quantity % int(run["config"]["lot"]) or quantity > order["capacity_shares"]:
+                raise ReplayError("fill violates lot or capacity")
             price = Decimal(fill["price"])
             reference = Decimal(fill["reference_price"])
-            _require(price, reference * (1 + (Decimal(run["config"]["half_spread_bps"]) + Decimal(run["config"]["slippage_bps"])) / 10000), "fill price")
+            cost_rate = (Decimal(run["config"]["half_spread_bps"]) + Decimal(run["config"]["slippage_bps"])) / 10000
+            _require(price, reference * (1 + cost_rate if kind == "buy" else 1 - cost_rate), "fill price")
             base = Decimal(fill["reference_notional"])
             notional = Decimal(fill["notional_brl"])
             spread = Decimal(fill["spread_cost"])
             slippage = Decimal(fill["slippage_cost"])
             fees = Decimal(fill["fees"])
-            debit = Decimal(fill["cash_debit"])
             _require(base, _money(reference * quantity), "reference notional")
             _require(notional, _money(price * quantity), "fill notional")
-            _require(spread, min(notional - base, _money(reference * quantity * Decimal(run["config"]["half_spread_bps"]) / 10000)), "spread")
-            _require(slippage, notional - base - spread, "slippage")
+            cost = notional - base if kind == "buy" else base - notional
+            _require(spread, min(cost, _money(reference * quantity * Decimal(run["config"]["half_spread_bps"]) / 10000)), "spread")
+            _require(slippage, cost - spread, "slippage")
             _require(fees, _money(notional * Decimal(run["config"]["fees_bps"]) / 10000), "fees")
-            _require(debit, notional + fees, "cash debit")
-            cash -= debit
-            positions[ident] = positions.get(ident, 0) + quantity
-            bases[ident] = bases.get(ident, Decimal(0)) + debit
-            _require(Decimal(row["cash_delta"]), -debit, "buy cash delta")
+            if kind == "buy":
+                debit = Decimal(fill["cash_debit"])
+                _require(debit, notional + fees, "cash debit")
+                cash -= debit
+                positions[ident] = positions.get(ident, 0) + quantity
+                bases[ident] = bases.get(ident, Decimal(0)) + debit
+                _require(Decimal(row["cash_delta"]), -debit, "buy cash delta")
+                if cash < 0:
+                    raise ReplayError("buy used cash before it was available")
+            else:
+                holding = positions.get(ident, 0)
+                if not 0 < quantity <= holding:
+                    raise ReplayError("sale exceeds position")
+                credit = notional - fees
+                removed = bases[ident] if quantity == holding else _money(bases[ident] * quantity / holding)
+                _require(Decimal(fill["cash_credit"]), credit, "sale cash credit")
+                _require(Decimal(fill["basis_removed"]), removed, "sale basis removed")
+                _require(Decimal(fill["realized_pnl"]), credit - removed, "sale realized P&L")
+                cash += credit
+                positions[ident] -= quantity
+                bases[ident] -= removed
+                _require(Decimal(row["cash_delta"]), credit, "sell cash delta")
             seen_fills.add(event_id)
         elif kind in ("split", "dividend_ex", "unresolved_delisting"):
             if event_id in seen_actions or event_id not in actions:
@@ -246,6 +298,10 @@ def _reconstruct(snapshot, run, tables):
                 fill = fills[event_id]
                 cash -= Decimal(fill["cash_debit"])
                 positions[ident] = positions.get(ident, 0) + fill["quantity"]
+            elif kind == "sell":
+                fill = fills[event_id]
+                cash += Decimal(fill["cash_credit"])
+                positions[ident] -= fill["quantity"]
             elif kind == "split":
                 positions[ident] = int(Decimal(positions[ident]) * Decimal(str(actions[event_id]["ratio"])))
             elif kind == "dividend_ex":
@@ -268,4 +324,4 @@ def _reconstruct(snapshot, run, tables):
         results.append(expected)
     _require(cash, Decimal(tables["ledger"][-1]["cash_brl"]) if tables["ledger"] else initial, "final cash")
     return {"run_id": run["run_id"], "cash_brl": cash, "positions": positions,
-            "receivables": receivables, "nav": tuple(results)}
+            "cost_basis": bases, "receivables": receivables, "nav": tuple(results)}

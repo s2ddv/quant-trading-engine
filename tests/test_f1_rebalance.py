@@ -46,7 +46,12 @@ class RebalanceTests(unittest.TestCase):
                           result["nav"][4]["nav_brl"]),
                          (Decimal("50432.20"), Decimal("50323.00"), Decimal("100755.20")))
         basis = {e["instrument_id"]: e["cost_basis"] for e in result["ledger"]}
-        self.assertEqual(basis["SYN-001"], Decimal("7556.32"))
+        self.assertEqual(basis, dict(zip(
+            ("SYN-001", "SYN-002", "SYN-003", "SYN-004", "SYN-005"),
+            map(Decimal, ("7556.32", "10090.12", "10063.08", "10080.11", "12704.03")))))
+        self.assertEqual({ident: mark["quantity"] for ident, mark in result["nav"][4]["marks"].items()},
+                         {"SYN-001": 503, "SYN-002": 325, "SYN-003": 314,
+                          "SYN-004": 305, "SYN-005": 403})
         self.assertEqual(sum(f["spread_cost"] + f["slippage_cost"] + f["fees"] for f in fills), Decimal("9.81"))
 
     def test_future_prices_do_not_rewrite_second_orders(self):

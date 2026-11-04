@@ -70,6 +70,10 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
     second_decision_at = second_decision_at.astimezone(timezone.utc)
     formation = formation_sessions(snapshot, second_decision_at)[-1]
     day = formation["session"]
+    first_year, first_month = map(int, first["manifest"]["formation_session"][:7].split("-"))
+    next_month = f"{first_year + (first_month == 12):04d}-{first_month % 12 + 1:02d}"
+    if day[:7] != next_month:
+        raise ValueError("second formation must be in the next calendar month")
     if day <= first["nav"][-1]["session"]:
         raise ValueError("second formation overlaps the first execution window")
     if first["nav"][-1]["status"] != "COMPLETE" or first["nav"][-1]["receivable_brl"]:
