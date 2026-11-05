@@ -93,6 +93,29 @@ class MonthlyTests(unittest.TestCase):
         self.assertEqual(sale, [50, 48])
         self.assertEqual(result["nav"][-1]["status"], "COMPLETE")
 
+    def test_suspended_third_sale_cannot_fund_new_buys(self):
+        config = F1Config(max_name_weight=Decimal("0.20"))
+        for row in self.payload["opens"]:
+            if row["instrument_id"] == "SYN-001" and row["session"] >= "2025-04-01":
+                row["tradable"] = False
+        result = run_f1_monthly(parse_snapshot(self.payload), decision_ats=DECISIONS, config=config)
+        formation = next(row for row in result["nav"] if row["session"] == "2025-03-31")
+        fills = [row for row in result["fills"] if row["order_id"].startswith("O3-")]
+        self.assertEqual(formation["cash_brl"], Decimal("23.09"))
+        self.assertFalse(any(row["side"] == "sell" for row in fills))
+        self.assertLessEqual(sum((row["cash_debit"] for row in fills), Decimal(0)),
+                             formation["cash_brl"])
+        self.assertTrue(any(row["order_id"] == "O3-SYN-001" and row["status"] == "EXPIRED"
+                            for row in result["order_states"]))
+
+    def test_third_orders_and_fills_obey_configured_lot(self):
+        result = run_f1_monthly(parse_snapshot(self.payload), decision_ats=DECISIONS,
+                                config=F1Config(lot=10))
+        self.assertTrue(all(row["quantity"] % 10 == 0 for row in result["orders"]
+                            if row["order_id"].startswith("O3-")))
+        self.assertTrue(all(row["quantity"] % 10 == 0 for row in result["fills"]
+                            if row["order_id"].startswith("O3-")))
+
     def test_total_sale_removes_exact_cost_basis(self):
         quote = _sell_quote(Decimal("10"), 3, F1Config(), 3, Decimal("100.01"))
         self.assertEqual(quote["basis_removed"], Decimal("100.01"))
