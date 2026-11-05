@@ -1,4 +1,4 @@
-"""One synthetic monthly rebalance after the original F1 formation."""
+"""Synthetic monthly rebalances after the original F1 formation."""
 
 from datetime import datetime, timedelta, timezone
 from decimal import Context, Decimal, ROUND_DOWN, localcontext
@@ -13,6 +13,7 @@ from . import F1Config, _Book, _affordable_fill, _quote, instant, money, run_f1
 
 
 REBALANCE_MODEL = "synthetic-f1-two-formations-v2"
+MONTHLY_MODEL = "synthetic-f1-monthly-v1"
 
 
 def _mark(snapshot, book, day, valued_at):
@@ -57,32 +58,45 @@ def _sell_quote(opening, quantity, config, position_quantity, cost_basis):
 def run_f1_two_formations(snapshot, *, first_decision_at: datetime,
                           second_decision_at: datetime, config: F1Config = F1Config()):
     """Run the existing first formation, then sell and rebalance at the next month end."""
+    return run_f1_monthly(snapshot, decision_ats=(first_decision_at, second_decision_at), config=config)
+
+
+def run_f1_monthly(snapshot, *, decision_ats, config: F1Config = F1Config()):
+    """Run successive monthly decisions on one synthetic, continuously marked book."""
+    decisions = tuple(decision_ats)
+    if len(decisions) < 2:
+        raise ValueError("monthly run requires at least two decisions")
     with localcontext(Context(prec=28)):
-        return _run_two(snapshot, first_decision_at, second_decision_at, config)
+        result = run_f1(snapshot, decision_at=decisions[0], config=config)
+        for cycle_index, decision_at in enumerate(decisions[1:], 2):
+            result = _extend(snapshot, result, decision_at, config, cycle_index)
+        return result
 
 
-def _run_two(snapshot, first_decision_at, second_decision_at, config):
-    first = run_f1(snapshot, decision_at=first_decision_at, config=config)
+def _extend(snapshot, first, second_decision_at, config, cycle_index):
     snapshot.check_as_of(second_decision_at)
     config.validate()
+    first_decision_at = datetime.fromisoformat(first["manifest"]["decision_at"])
     if second_decision_at <= first_decision_at:
-        raise ValueError("second decision must follow the first")
+        raise ValueError("monthly decisions must be strictly increasing")
     second_decision_at = second_decision_at.astimezone(timezone.utc)
     formation = formation_sessions(snapshot, second_decision_at)[-1]
     day = formation["session"]
-    first_year, first_month = map(int, first["manifest"]["formation_session"][:7].split("-"))
+    previous_formation = (first["manifest"]["decision_windows"][-1]["formation_session"]
+                          if "decision_windows" in first["manifest"] else first["manifest"]["formation_session"])
+    first_year, first_month = map(int, previous_formation[:7].split("-"))
     next_month = f"{first_year + (first_month == 12):04d}-{first_month % 12 + 1:02d}"
     if day[:7] != next_month:
-        raise ValueError("second formation must be in the next calendar month")
+        raise ValueError("each formation must be in the next calendar month")
     if day <= first["nav"][-1]["session"]:
-        raise ValueError("second formation overlaps the first execution window")
+        raise ValueError("monthly formation overlaps the prior execution window")
     if first["nav"][-1]["status"] != "COMPLETE":
-        raise ValueError("second formation requires a complete opening NAV")
+        raise ValueError("monthly formation requires a complete opening NAV")
 
     sessions = [s for s in snapshot.payload["calendar"]["sessions"]
                 if instant(s["open_at"]) > second_decision_at][:config.expiry_sessions]
     if len(sessions) != config.expiry_sessions:
-        raise ValueError("snapshot lacks the second order expiry window")
+        raise ValueError("snapshot lacks the monthly order expiry window")
     for session in sessions:
         snapshot.check_as_of(instant(session["close_at"]) + timedelta(minutes=config.mark_delay_minutes))
 
@@ -109,17 +123,17 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
         valued_at = instant(session["close_at"]) + timedelta(minutes=config.mark_delay_minutes)
         snapshot.check_as_of(valued_at)
         if bridge_day == day and valued_at > second_decision_at:
-            raise ValueError("second decision precedes formation mark")
+            raise ValueError("monthly decision precedes formation mark")
         book.actions(snapshot, bridge_day, open_at, bridge[0]["session"], {})
         book.actions(snapshot, bridge_day, valued_at, bridge[0]["session"], {})
         bridge_nav.append(_mark(snapshot, book, bridge_day, valued_at))
     formation_nav = bridge_nav[-1]
     if formation_nav["status"] != "COMPLETE":
-        raise ValueError("second formation has incomplete NAV")
+        raise ValueError("monthly formation has incomplete NAV")
     signals = momentum_12_2(snapshot, decision_at=second_decision_at, formation_session=day)
     selected = sorted((s for s in signals if s.eligible), key=lambda s: (-s.score, s.instrument_id))[:10]
     if len(selected) < 5:
-        raise ValueError("second formation requires five eligible instruments")
+        raise ValueError("monthly formation requires five eligible instruments")
     weight = min(Decimal(1) / len(selected), config.max_name_weight)
     eligible = {s.instrument_id: s for s in selected}
     bars = snapshot.available("bars", second_decision_at)
@@ -142,7 +156,9 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
         capacity = int(Decimal(min(r["volume_shares"] for r in history[-50:])) * config.max_participation) if len(history) >= 50 else 0
         input_keys = set(eligible[ident].input_keys if ident in eligible else ())
         input_keys.update(f"bar:{ident}:{r['session']}" for r in history[-50:])
-        orders.append(dict(order_id=f"O2-{ident}", formation_id="second", instrument_id=ident,
+        orders.append(dict(order_id=f"O{cycle_index}-{ident}",
+                           formation_id="second" if cycle_index == 2 else f"monthly-{cycle_index}",
+                           instrument_id=ident,
                            created_at=second_decision_at, earliest_execution_at=instant(sessions[0]["open_at"]),
                            side="buy" if delta > 0 else "sell", quantity=quantity,
                            target_weight=weight if ident in eligible else Decimal(0),
@@ -196,7 +212,8 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
             fills.append(dict(fill_id=fill_id, order_id=order["order_id"], instrument_id=ident,
                               executed_at=open_at, session=trade_day, side=order["side"], quantity=quantity,
                               **quote, source_key=f"open:{ident}:{trade_day}",
-                              input_available_at=instant(event["available_at"]), model_id=REBALANCE_MODEL))
+                              input_available_at=instant(event["available_at"]),
+                              model_id=REBALANCE_MODEL if cycle_index == 2 else MONTHLY_MODEL))
             book.record(fill_id, trade_day, order["side"], ident,
                         quote["cash_credit"] if order["side"] == "sell" else -quote["cash_debit"])
         book.actions(snapshot, trade_day, valued_at, first_day, states)
@@ -206,15 +223,27 @@ def _run_two(snapshot, first_decision_at, second_decision_at, config):
             state.update(status="EXPIRED", reason="expiry_session_reached")
 
     manifest = dict(first["manifest"])
-    manifest.update(schema_version=4, model_id=REBALANCE_MODEL,
-                    second_decision_at=second_decision_at.isoformat(), second_formation_session=day,
-                    bridge_sessions=[s["session"] for s in bridge],
-                    decision_windows=[dict(decision_at=first["manifest"]["decision_at"],
-                                           formation_session=first["manifest"]["formation_session"],
-                                           execution_sessions=[r["session"] for r in first["nav"]]),
-                                      dict(decision_at=second_decision_at.isoformat(),
-                                           formation_session=day,
-                                           execution_sessions=[r["session"] for r in sessions])])
+    if cycle_index == 2:
+        manifest.update(schema_version=4, model_id=REBALANCE_MODEL,
+                        second_decision_at=second_decision_at.isoformat(), second_formation_session=day,
+                        bridge_sessions=[s["session"] for s in bridge],
+                        decision_windows=[dict(decision_at=first["manifest"]["decision_at"],
+                                               formation_session=first["manifest"]["formation_session"],
+                                               execution_sessions=[r["session"] for r in first["nav"]]),
+                                          dict(decision_at=second_decision_at.isoformat(),
+                                               formation_session=day,
+                                               execution_sessions=[r["session"] for r in sessions])])
+    else:
+        windows = [dict(window) for window in first["manifest"]["decision_windows"]]
+        if cycle_index == 3:
+            windows[0]["bridge_sessions"] = []
+            windows[1]["bridge_sessions"] = first["manifest"]["bridge_sessions"]
+        windows.append(dict(decision_at=second_decision_at.isoformat(), formation_session=day,
+                            bridge_sessions=[s["session"] for s in bridge],
+                            execution_sessions=[s["session"] for s in sessions]))
+        for key in ("second_decision_at", "second_formation_session", "bridge_sessions"):
+            manifest.pop(key, None)
+        manifest.update(schema_version=5, model_id=MONTHLY_MODEL, decision_windows=windows)
     del manifest["run_id"]
     manifest["run_id"] = sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return dict(manifest=manifest, signals=first["signals"] + signals,

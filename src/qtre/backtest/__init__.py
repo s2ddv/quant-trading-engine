@@ -258,4 +258,4 @@ def _run(snapshot, decision_at, config, formation_session):
                 portfolio_reason=portfolio_reason, fills=tuple(fills), ledger=tuple(book.ledger), nav=tuple(nav))
 
 
-from .rebalance import run_f1_two_formations
+from .rebalance import run_f1_monthly, run_f1_two_formations

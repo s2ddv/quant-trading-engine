@@ -16,6 +16,7 @@ TABLES = ("orders", "order_states", "fills", "ledger", "nav")
 SCHEMA_VERSION = 1
 REBALANCE_SCHEMA_VERSION = 2
 CONTINUOUS_SCHEMA_VERSION = 3
+MONTHLY_SCHEMA_VERSION = 4
 CENT = Decimal("0.01")
 
 
@@ -64,7 +65,8 @@ def write_f1_run(snapshot: Snapshot, result: Mapping, directory: str | Path) -> 
     for table in TABLES:
         contents[f"{table}.jsonl"] = b"".join(
             _json(dict(run_id=run_id, **row)) + b"\n" for row in result[table])
-    schema = (CONTINUOUS_SCHEMA_VERSION if manifest.get("schema_version") == 4 else
+    schema = (MONTHLY_SCHEMA_VERSION if manifest.get("schema_version") == 5 else
+              CONTINUOUS_SCHEMA_VERSION if manifest.get("schema_version") == 4 else
               REBALANCE_SCHEMA_VERSION if manifest.get("schema_version") == 3 else SCHEMA_VERSION)
     envelope = dict(artifact_schema_version=schema, run=manifest,
                     files={name: sha256(contents[name]).hexdigest() for name in FILES})
@@ -97,11 +99,12 @@ def replay_f1(directory: str | Path) -> dict:
     try:
         envelope = _load_json((root / "manifest.json").read_bytes(), "manifest.json")
         if envelope["artifact_schema_version"] not in (SCHEMA_VERSION, REBALANCE_SCHEMA_VERSION,
-                                                         CONTINUOUS_SCHEMA_VERSION) or set(envelope["files"]) != set(FILES):
+                                                         CONTINUOUS_SCHEMA_VERSION, MONTHLY_SCHEMA_VERSION) or set(envelope["files"]) != set(FILES):
             raise ReplayError("manifest: unsupported schema or file set")
         run = envelope["run"]
         _require(envelope["artifact_schema_version"],
-                 (CONTINUOUS_SCHEMA_VERSION if run["schema_version"] == 4 else
+                 (MONTHLY_SCHEMA_VERSION if run["schema_version"] == 5 else
+                  CONTINUOUS_SCHEMA_VERSION if run["schema_version"] == 4 else
                   REBALANCE_SCHEMA_VERSION if run["schema_version"] == 3 else SCHEMA_VERSION),
                  "artifact schema")
         run_id = run["run_id"]
@@ -141,7 +144,39 @@ def _reconstruct(snapshot, run, tables):
     expected_days = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
                      if datetime.fromisoformat(s["open_at"].replace("Z", "+00:00")) > decision]
     expiry = int(run["config"]["expiry_sessions"])
-    if run["schema_version"] in (3, 4):
+    if run["schema_version"] == 5:
+        windows = run["decision_windows"]
+        if len(windows) < 3:
+            raise ReplayError("monthly run requires at least three windows")
+        _require(windows[0]["decision_at"], run["decision_at"], "first decision")
+        _require(windows[0]["formation_session"], run["formation_session"], "first formation")
+        expected = []
+        previous_execution = None
+        previous_formation = None
+        previous_decision = None
+        for index, window in enumerate(windows):
+            window_decision = datetime.fromisoformat(window["decision_at"].replace("Z", "+00:00"))
+            execution = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
+                         if datetime.fromisoformat(s["open_at"].replace("Z", "+00:00")) > window_decision][:expiry]
+            _require(window["execution_sessions"], execution, f"window {index + 1} execution")
+            if previous_execution is None:
+                _require(window["bridge_sessions"], [], "first bridge")
+            else:
+                if window_decision <= previous_decision:
+                    raise ReplayError("monthly decisions out of order")
+                year, month = map(int, previous_formation[:7].split("-"))
+                next_month = f"{year + (month == 12):04d}-{month % 12 + 1:02d}"
+                if window["formation_session"][:7] != next_month:
+                    raise ReplayError("monthly formation gap")
+                bridge = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
+                          if previous_execution[-1] < s["session"] <= window["formation_session"]]
+                _require(window["bridge_sessions"], bridge, f"window {index + 1} bridge")
+                expected.extend(bridge)
+            expected.extend(execution)
+            previous_execution = execution
+            previous_formation = window["formation_session"]
+            previous_decision = window_decision
+    elif run["schema_version"] in (3, 4):
         second_decision = datetime.fromisoformat(run["second_decision_at"].replace("Z", "+00:00"))
         second_days = [s["session"] for s in snapshot.payload["calendar"]["sessions"]
                        if datetime.fromisoformat(s["open_at"].replace("Z", "+00:00")) > second_decision][:expiry]
@@ -174,8 +209,16 @@ def _reconstruct(snapshot, run, tables):
     cash, positions, bases, receivables = initial, {}, {}, {}
     seen_fills, seen_actions = set(), set()
     buy_days = set()
-    unresolved = set()
     actions = {row["action_id"]: row for row in snapshot.payload["actions"]}
+    actions_by_ex = {}
+    actions_by_pay = {}
+    for action in actions.values():
+        actions_by_ex.setdefault(action["ex_session"], []).append(action)
+        if action.get("pay_session"):
+            actions_by_pay.setdefault(action["pay_session"], []).append(action)
+    ledger_by_day = {}
+    for entry in tables["ledger"]:
+        ledger_by_day.setdefault(entry["session"], []).append(entry)
     for row in tables["ledger"]:
         event_id, kind, ident, day = (row[key] for key in ("event_id", "kind", "instrument_id", "session"))
         if kind in ("buy", "sell"):
@@ -264,8 +307,6 @@ def _reconstruct(snapshot, run, tables):
                 positions[ident] = int(updated)
             elif kind == "dividend_ex":
                 receivables[event_id] = _money(Decimal(positions[ident]) * Decimal(str(action["cash_per_share"])))
-            else:
-                unresolved.add(ident)
             _require(Decimal(row["cash_delta"]), Decimal(0), "action cash delta")
             seen_actions.add(event_id)
         elif kind == "dividend_pay":
@@ -297,12 +338,31 @@ def _reconstruct(snapshot, run, tables):
     results = []
     # Reapply ledger events at each session boundary to reconstruct historical NAV.
     cash, positions, receivables = initial, {}, {}
+    historical_unresolved = set()
     for row in tables["nav"]:
         day = row["session"]
+        daily_events = ledger_by_day.get(day, ())
+        daily_ids = {entry["event_id"] for entry in daily_events}
+        open_at = datetime.fromisoformat(calendar[day]["open_at"].replace("Z", "+00:00"))
+        valued_at = datetime.fromisoformat(row["valued_at"].replace("Z", "+00:00"))
+        for action in actions_by_ex.get(day, ()):
+            action_id = action["action_id"]
+            available = datetime.fromisoformat(action["available_at"].replace("Z", "+00:00"))
+            if positions.get(action["instrument_id"], 0):
+                if available > open_at:
+                    raise ReplayError(f"late corporate action {action_id}")
+                if action_id not in daily_ids:
+                    raise ReplayError(f"missing corporate action {action_id}")
+        for action in actions_by_pay.get(day, ()):
+            action_id = action["action_id"]
+            available = datetime.fromisoformat(action["available_at"].replace("Z", "+00:00"))
+            if action_id in receivables and available <= valued_at:
+                if f"{action_id}-pay" not in daily_ids:
+                    raise ReplayError(f"missing dividend payment {action_id}")
         close = datetime.fromisoformat(calendar[day]["close_at"].replace("Z", "+00:00"))
         _require(datetime.fromisoformat(row["valued_at"].replace("Z", "+00:00")),
                  close + timedelta(minutes=int(run["config"]["mark_delay_minutes"])), "NAV time")
-        for entry in (e for e in tables["ledger"] if e["session"] == day):
+        for entry in daily_events:
             ident, kind, event_id = entry["instrument_id"], entry["kind"], entry["event_id"]
             if kind == "buy":
                 fill = fills[event_id]
@@ -316,11 +376,13 @@ def _reconstruct(snapshot, run, tables):
                 positions[ident] = int(Decimal(positions[ident]) * Decimal(str(actions[event_id]["ratio"])))
             elif kind == "dividend_ex":
                 receivables[event_id] = _money(Decimal(positions[ident]) * Decimal(str(actions[event_id]["cash_per_share"])))
+            elif kind == "unresolved_delisting":
+                historical_unresolved.add(ident)
             elif kind == "dividend_pay":
                 cash += receivables.pop(event_id.removesuffix("-pay"))
-        valued_at = datetime.fromisoformat(row["valued_at"].replace("Z", "+00:00"))
         closes = {bar["instrument_id"]: bar for bar in snapshot.available("bars", valued_at) if bar["session"] == day}
-        missing = sorted(ident for ident, quantity in positions.items() if quantity and (ident not in closes or ident in unresolved and any(e["session"] <= day and e["kind"] == "unresolved_delisting" and e["instrument_id"] == ident for e in tables["ledger"])))
+        missing = sorted(ident for ident, quantity in positions.items()
+                         if quantity and (ident not in closes or ident in historical_unresolved))
         marks = {ident: {"quantity": quantity, "price": str(closes[ident]["close"]), "source_key": f"bar:{ident}:{day}"}
                  for ident, quantity in positions.items() if ident in closes and ident not in missing}
         value = None if missing else _money(sum((Decimal(m["price"]) * m["quantity"] for m in marks.values()), Decimal(0)))
