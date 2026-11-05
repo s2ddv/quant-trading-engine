@@ -2,7 +2,7 @@
 
 A quantitative research engine for investigating 12–2 cross-sectional momentum in B3 equities. The [technical specification](docs/especificacao-tecnica.md) defines the engine contracts, and the [research roadmap](docs/roadmap-competencias.md) tracks the planned work. The repository currently contains synthetic signal, execution, accounting, and independent replay examples, plus an exploratory `yfinance` data probe. **There is no validated backtest using B3 market data.**
 
-## Current status: synthetic F1 research prototype
+## Current status: synthetic F1 complete; F2 validation starting
 
 The parser in `src/qtre/data/snapshot.py` validates schema-1 JSON snapshots and computes SHA-256 over canonical JSON bytes (sorted keys, no whitespace). Identical content yields the same hash, and parsed records are frozen. The calendar is an explicit list of synthetic sessions in `America/Sao_Paulo`; its UTC times are not an official B3 calendar.
 
@@ -27,6 +27,8 @@ reconstructed = replay_f1("/tmp/qtre-f1-example")
 The [second synthetic formation](docs/contrato-f1-segunda-formacao.md) adds a sale, purchases after that sale, and reconciled NAV. `run_f1_two_formations` runs the January 31 and February 28 decisions on `synthetic_f1_rebalance_v1.json`. Saved runs can be replayed independently. The [intermediate-session contract](docs/contrato-f1-sessoes-intermediarias.md) extends this example with daily marks and corporate actions between decisions, including a dividend receivable carried until payment; see [artifact schema 3](docs/artefatos-f1-v3.md). For the two-decision example, pass the dates from the [manual contract](docs/contrato-f1-segunda-formacao.md) as `first_decision_at` and `second_decision_at`, then pass the result to `write_f1_run` and its output directory to `replay_f1`.
 
 The [third-formation contract](docs/contrato-f1-terceira-formacao.md) fixes the March decision's orders, costs, cash, and NAV by hand. `run_f1_monthly` repeats the causal monthly cycle over a caller-supplied sequence of decisions; a fourth decision is also exercised in tests. [Artifact schema 4](docs/artefatos-f1-v4.md) stores every window for independent replay. A [synthetic delisting contract](docs/contrato-f1-deslistagem-sintetica.md) covers both a declared cash exit and an unresolved exit; the latter keeps NAV incomplete. [Snapshot schema 2](docs/contrato-snapshot-v2.md) and [artifact schema 5](docs/artefatos-f1-v5.md) version the declared cash event. Choose a new output directory for each run: artifact writing refuses to silently replace an existing directory.
+
+F1 is complete within this controlled synthetic scope. The next phase, F2, starts with a fixed research protocol, synthetic controls, and an audit of the causal event trail. The four synthetic decisions exercise software behavior; they are too few for a meaningful out-of-sample performance claim.
 
 ```python
 from datetime import datetime, timezone
