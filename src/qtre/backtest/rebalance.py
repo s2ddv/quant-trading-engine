@@ -12,8 +12,8 @@ from qtre.universe import listed_members
 from . import F1Config, _Book, _affordable_fill, _quote, instant, money, run_f1
 
 
-REBALANCE_MODEL = "synthetic-f1-two-formations-v2"
-MONTHLY_MODEL = "synthetic-f1-monthly-v1"
+REBALANCE_MODEL = "synthetic-f1-two-formations-v3"
+MONTHLY_MODEL = "synthetic-f1-monthly-v2"
 
 
 def _mark(snapshot, book, day, valued_at):
@@ -132,9 +132,10 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
         raise ValueError("monthly formation has incomplete NAV")
     signals = momentum_12_2(snapshot, decision_at=second_decision_at, formation_session=day)
     selected = sorted((s for s in signals if s.eligible), key=lambda s: (-s.score, s.instrument_id))[:10]
+    portfolio_reason = "targets_formed" if len(selected) >= 5 else "fewer_than_five_eligible"
     if len(selected) < 5:
-        raise ValueError("monthly formation requires five eligible instruments")
-    weight = min(Decimal(1) / len(selected), config.max_name_weight)
+        selected = []
+    weight = min(Decimal(1) / len(selected), config.max_name_weight) if selected else Decimal(0)
     eligible = {s.instrument_id: s for s in selected}
     bars = snapshot.available("bars", second_decision_at)
     formation_bars = {bar["instrument_id"]: bar for bar in bars if bar["session"] == day}
@@ -142,7 +143,7 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
     for bar in bars:
         histories.setdefault(bar["instrument_id"], []).append(bar)
     orders = []
-    for ident in sorted(set(book.positions) | set(eligible)):
+    for ident in sorted({ident for ident, quantity in book.positions.items() if quantity} | set(eligible)):
         if ident not in formation_bars:
             raise ValueError(f"missing formation close for {ident}")
         ref = Decimal(str(formation_bars[ident]["close"]))
@@ -229,10 +230,12 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
                         bridge_sessions=[s["session"] for s in bridge],
                         decision_windows=[dict(decision_at=first["manifest"]["decision_at"],
                                                formation_session=first["manifest"]["formation_session"],
-                                               execution_sessions=[r["session"] for r in first["nav"]]),
+                                               execution_sessions=[r["session"] for r in first["nav"]],
+                                               portfolio_reason=first["portfolio_reason"]),
                                           dict(decision_at=second_decision_at.isoformat(),
                                                formation_session=day,
-                                               execution_sessions=[r["session"] for r in sessions])])
+                                               execution_sessions=[r["session"] for r in sessions],
+                                               portfolio_reason=portfolio_reason)])
     else:
         windows = [dict(window) for window in first["manifest"]["decision_windows"]]
         if cycle_index == 3:
@@ -240,14 +243,18 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
             windows[1]["bridge_sessions"] = first["manifest"]["bridge_sessions"]
         windows.append(dict(decision_at=second_decision_at.isoformat(), formation_session=day,
                             bridge_sessions=[s["session"] for s in bridge],
-                            execution_sessions=[s["session"] for s in sessions]))
+                            execution_sessions=[s["session"] for s in sessions],
+                            portfolio_reason=portfolio_reason))
         for key in ("second_decision_at", "second_formation_session", "bridge_sessions"):
             manifest.pop(key, None)
         manifest.update(schema_version=5, model_id=MONTHLY_MODEL, decision_windows=windows)
+    if any(row["kind"] == "delisting_ex" for row in first["ledger"] + tuple(book.ledger)):
+        manifest["event_schema_version"] = 2
     del manifest["run_id"]
     manifest["run_id"] = sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return dict(manifest=manifest, signals=first["signals"] + signals,
                 orders=first["orders"] + tuple(orders),
                 order_states=first["order_states"] + tuple(states.values()),
                 fills=first["fills"] + tuple(fills), ledger=first["ledger"] + tuple(book.ledger),
-                nav=first["nav"] + tuple(bridge_nav[:-1]) + tuple(nav), formation_nav=formation_nav)
+                nav=first["nav"] + tuple(bridge_nav[:-1]) + tuple(nav),
+                formation_nav=formation_nav, portfolio_reason=portfolio_reason)

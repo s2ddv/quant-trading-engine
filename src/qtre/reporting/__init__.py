@@ -17,6 +17,7 @@ SCHEMA_VERSION = 1
 REBALANCE_SCHEMA_VERSION = 2
 CONTINUOUS_SCHEMA_VERSION = 3
 MONTHLY_SCHEMA_VERSION = 4
+DELISTING_SCHEMA_VERSION = 5
 CENT = Decimal("0.01")
 
 
@@ -60,12 +61,15 @@ def write_f1_run(snapshot: Snapshot, result: Mapping, directory: str | Path) -> 
     manifest = result["manifest"]
     if not manifest.get("synthetic") or manifest.get("snapshot_hash") != snapshot.content_hash:
         raise ValueError("result manifest does not identify the synthetic snapshot")
+    if any(row["kind"] == "delisting_ex" for row in result["ledger"]) and manifest.get("event_schema_version") != 2:
+        raise ValueError("resolved delisting requires event schema version 2")
     run_id = manifest["run_id"]
     contents = {"snapshot.json": _json(snapshot.payload) + b"\n"}
     for table in TABLES:
         contents[f"{table}.jsonl"] = b"".join(
             _json(dict(run_id=run_id, **row)) + b"\n" for row in result[table])
-    schema = (MONTHLY_SCHEMA_VERSION if manifest.get("schema_version") == 5 else
+    schema = (DELISTING_SCHEMA_VERSION if manifest.get("event_schema_version") == 2 else
+              MONTHLY_SCHEMA_VERSION if manifest.get("schema_version") == 5 else
               CONTINUOUS_SCHEMA_VERSION if manifest.get("schema_version") == 4 else
               REBALANCE_SCHEMA_VERSION if manifest.get("schema_version") == 3 else SCHEMA_VERSION)
     envelope = dict(artifact_schema_version=schema, run=manifest,
@@ -99,11 +103,13 @@ def replay_f1(directory: str | Path) -> dict:
     try:
         envelope = _load_json((root / "manifest.json").read_bytes(), "manifest.json")
         if envelope["artifact_schema_version"] not in (SCHEMA_VERSION, REBALANCE_SCHEMA_VERSION,
-                                                         CONTINUOUS_SCHEMA_VERSION, MONTHLY_SCHEMA_VERSION) or set(envelope["files"]) != set(FILES):
+                                                         CONTINUOUS_SCHEMA_VERSION, MONTHLY_SCHEMA_VERSION,
+                                                         DELISTING_SCHEMA_VERSION) or set(envelope["files"]) != set(FILES):
             raise ReplayError("manifest: unsupported schema or file set")
         run = envelope["run"]
         _require(envelope["artifact_schema_version"],
-                 (MONTHLY_SCHEMA_VERSION if run["schema_version"] == 5 else
+                 (DELISTING_SCHEMA_VERSION if run.get("event_schema_version") == 2 else
+                  MONTHLY_SCHEMA_VERSION if run["schema_version"] == 5 else
                   CONTINUOUS_SCHEMA_VERSION if run["schema_version"] == 4 else
                   REBALANCE_SCHEMA_VERSION if run["schema_version"] == 3 else SCHEMA_VERSION),
                  "artifact schema")
@@ -205,6 +211,8 @@ def _reconstruct(snapshot, run, tables):
         raise ReplayError("duplicate fill_id")
     if len({row["event_id"] for row in tables["ledger"]}) != len(tables["ledger"]):
         raise ReplayError("duplicate ledger event_id")
+    if any(row["kind"] == "delisting_ex" for row in tables["ledger"]) and run.get("event_schema_version") != 2:
+        raise ReplayError("resolved delisting requires event schema version 2")
     initial = Decimal(run["config"]["initial_cash"])
     cash, positions, bases, receivables = initial, {}, {}, {}
     seen_fills, seen_actions = set(), set()
@@ -294,12 +302,15 @@ def _reconstruct(snapshot, run, tables):
                 bases[ident] -= removed
                 _require(Decimal(row["cash_delta"]), credit, "sell cash delta")
             seen_fills.add(event_id)
-        elif kind in ("split", "dividend_ex", "unresolved_delisting"):
+        elif kind in ("split", "dividend_ex", "unresolved_delisting", "delisting_ex"):
             if event_id in seen_actions or event_id not in actions:
                 raise ReplayError(f"ledger: duplicate or unknown action {event_id}")
             action = actions[event_id]
             _require((ident, day), (action["instrument_id"], action["ex_session"]), "action identity")
-            _require(kind, {"split": "split", "dividend": "dividend_ex", "delisting": "unresolved_delisting"}[action["kind"]], "action kind")
+            expected_kind = {"split": "split", "dividend": "dividend_ex",
+                             "delisting": "delisting_ex" if "exit_cash_per_share" in action
+                             else "unresolved_delisting"}[action["kind"]]
+            _require(kind, expected_kind, "action kind")
             if kind == "split":
                 updated = Decimal(positions[ident]) * Decimal(str(action["ratio"]))
                 if updated != int(updated):
@@ -307,13 +318,26 @@ def _reconstruct(snapshot, run, tables):
                 positions[ident] = int(updated)
             elif kind == "dividend_ex":
                 receivables[event_id] = _money(Decimal(positions[ident]) * Decimal(str(action["cash_per_share"])))
+            elif kind == "delisting_ex":
+                quantity = positions.get(ident, 0)
+                if not quantity:
+                    raise ReplayError("resolved delisting without position")
+                amount = _money(Decimal(quantity) * Decimal(str(action["exit_cash_per_share"])))
+                removed = bases[ident]
+                _require(Decimal(row["basis_removed"]), removed, "delisting basis removed")
+                _require(Decimal(row["realized_pnl"]), amount - removed, "delisting realized P&L")
+                positions[ident] = 0
+                bases[ident] = Decimal(0)
+                receivables[event_id] = amount
             _require(Decimal(row["cash_delta"]), Decimal(0), "action cash delta")
             seen_actions.add(event_id)
-        elif kind == "dividend_pay":
+        elif kind in ("dividend_pay", "delisting_pay"):
             action_id = event_id.removesuffix("-pay")
             if action_id not in receivables:
                 raise ReplayError(f"payment without receivable: {event_id}")
             _require(day, actions[action_id]["pay_session"], "payment session")
+            _require(kind, "delisting_pay" if actions[action_id]["kind"] == "delisting"
+                     else "dividend_pay", "payment kind")
             amount = receivables.pop(action_id)
             cash += amount
             _require(Decimal(row["cash_delta"]), amount, "payment cash delta")
@@ -376,15 +400,19 @@ def _reconstruct(snapshot, run, tables):
                 positions[ident] = int(Decimal(positions[ident]) * Decimal(str(actions[event_id]["ratio"])))
             elif kind == "dividend_ex":
                 receivables[event_id] = _money(Decimal(positions[ident]) * Decimal(str(actions[event_id]["cash_per_share"])))
+            elif kind == "delisting_ex":
+                receivables[event_id] = _money(Decimal(positions[ident]) *
+                                               Decimal(str(actions[event_id]["exit_cash_per_share"])))
+                positions[ident] = 0
             elif kind == "unresolved_delisting":
                 historical_unresolved.add(ident)
-            elif kind == "dividend_pay":
+            elif kind in ("dividend_pay", "delisting_pay"):
                 cash += receivables.pop(event_id.removesuffix("-pay"))
         closes = {bar["instrument_id"]: bar for bar in snapshot.available("bars", valued_at) if bar["session"] == day}
         missing = sorted(ident for ident, quantity in positions.items()
                          if quantity and (ident not in closes or ident in historical_unresolved))
         marks = {ident: {"quantity": quantity, "price": str(closes[ident]["close"]), "source_key": f"bar:{ident}:{day}"}
-                 for ident, quantity in positions.items() if ident in closes and ident not in missing}
+                 for ident, quantity in positions.items() if quantity and ident in closes and ident not in missing}
         value = None if missing else _money(sum((Decimal(m["price"]) * m["quantity"] for m in marks.values()), Decimal(0)))
         due = sum(receivables.values(), Decimal(0))
         expected = {"session": day, "valued_at": row["valued_at"], "status": "NAV_INCOMPLETO" if missing else "COMPLETE",

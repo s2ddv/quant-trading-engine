@@ -154,13 +154,22 @@ class _Book:
                 self.receivables[action_id] = money(Decimal(quantity) * Decimal(str(action["cash_per_share"])))
                 self.record(action_id, day, "dividend_ex", ident)
             elif action["kind"] == "delisting" and quantity:
-                self.unresolved.add(ident)
-                self.record(action_id, day, "unresolved_delisting", ident)
+                if "exit_cash_per_share" in action:
+                    credit = money(Decimal(quantity) * Decimal(str(action["exit_cash_per_share"])))
+                    removed = self.cost_basis.pop(ident, Decimal(0))
+                    self.positions[ident] = 0
+                    self.receivables[action_id] = credit
+                    self.record(action_id, day, "delisting_ex", ident)
+                    self.ledger[-1].update(basis_removed=removed, realized_pnl=credit - removed)
+                else:
+                    self.unresolved.add(ident)
+                    self.record(action_id, day, "unresolved_delisting", ident)
         for action in known:
             if action.get("pay_session") == day and action["action_id"] in self.receivables:
                 payment = self.receivables.pop(action["action_id"])
                 self.cash += payment
-                self.record(action["action_id"] + "-pay", day, "dividend_pay", action["instrument_id"], payment)
+                kind = "delisting_pay" if action["kind"] == "delisting" else "dividend_pay"
+                self.record(action["action_id"] + "-pay", day, kind, action["instrument_id"], payment)
 
 
 def _code_hash() -> str:
@@ -253,6 +262,8 @@ def _run(snapshot, decision_at, config, formation_session):
                     monetary_rounding="ROUND_HALF_UP; slippage absorbs cent residual",
                     settlement="synthetic_immediate", formation_session=formation,
                     decision_at=decision_at.isoformat(), config=config_data)
+    if any(row["kind"] == "delisting_ex" for row in book.ledger):
+        manifest["event_schema_version"] = 2
     manifest["run_id"] = sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return dict(manifest=manifest, signals=signals, orders=orders, order_states=tuple(states.values()),
                 portfolio_reason=portfolio_reason, fills=tuple(fills), ledger=tuple(book.ledger), nav=tuple(nav))

@@ -153,8 +153,8 @@ class Snapshot:
 
 def parse_snapshot(payload: Any) -> Snapshot:
     root = _object(payload, "snapshot", {"schema_version", "snapshot_id", "as_of", "calendar", "bars", "opens", "actions", "memberships", "symbols"})
-    if type(root["schema_version"]) is not int or root["schema_version"] != 1:
-        _fail("schema_version", "expected version 1")
+    if type(root["schema_version"]) is not int or root["schema_version"] not in (1, 2):
+        _fail("schema_version", "expected version 1 or 2")
     snapshot_id = _string(root["snapshot_id"], "snapshot_id")
     as_of = _instant(root["as_of"], "as_of")
     cal = _object(root["calendar"], "calendar", {"calendar_id", "timezone", "sessions"})
@@ -199,7 +199,8 @@ def parse_snapshot(payload: Any) -> Snapshot:
                 "memberships": {"instrument_id", "valid_from", "valid_to", "status", "reason"},
                 "symbols": {"instrument_id", "ticker", "valid_from", "valid_to"},
             }[collection] | _COMMON
-            optional = {"actions": {"record_session", "pay_session", "ratio", "cash_per_share", "successor_id"}}.get(collection, set())
+            optional = {"actions": {"record_session", "pay_session", "ratio", "cash_per_share", "successor_id"}
+                        | ({"exit_cash_per_share"} if root["schema_version"] == 2 else set())}.get(collection, set())
             _object(row, path, required, optional)
             _provenance(row, path, snapshot_id, as_of)
             _string(row["instrument_id"], f"{path}.instrument_id")
@@ -250,6 +251,12 @@ def parse_snapshot(payload: Any) -> Snapshot:
                         _fail(path, "dividend requires pay_session")
                     if row["pay_session"] < row["ex_session"]:
                         _fail(path, "dividend payment before ex_session")
+                if "exit_cash_per_share" in row:
+                    if row["kind"] != "delisting":
+                        _fail(path, "exit cash requires delisting")
+                    _money(row["exit_cash_per_share"], f"{path}.exit_cash_per_share")
+                    if not row.get("pay_session") or row["pay_session"] < row["ex_session"]:
+                        _fail(path, "resolved delisting requires payment on or after ex-session")
             else:
                 start = _date(row["valid_from"], f"{path}.valid_from")
                 end = _date(row["valid_to"], f"{path}.valid_to") if row["valid_to"] is not None else None
