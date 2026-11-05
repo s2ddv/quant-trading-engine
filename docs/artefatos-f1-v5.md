@@ -18,3 +18,10 @@ decisão exige NAV completo. Os esquemas 1 a 4 continuam legíveis.
 
 O valor de saída da fixture é uma hipótese controlada. Dados reais exigem
 fonte, vigência, direito econômico e prazo de pagamento verificáveis.
+
+A revisão de 05/11 reforça a validação sem mudar o formato: o replay
+rejeita quantidade executada acima da ordem, estado final incompatível com
+os fills, cancelamento sem split/deslistagem aplicável, fill após esse
+cancelamento e pagamento atribuído a outro instrumento. Eventos corporativos
+e pagamentos precedem as negociações da sessão. Essas verificações também
+se aplicam aos esquemas anteriores e independem dos hashes dos arquivos.

@@ -217,6 +217,8 @@ def _reconstruct(snapshot, run, tables):
     cash, positions, bases, receivables = initial, {}, {}, {}
     seen_fills, seen_actions = set(), set()
     buy_days = set()
+    trade_days = set()
+    filled_by_order = {}
     actions = {row["action_id"]: row for row in snapshot.payload["actions"]}
     actions_by_ex = {}
     actions_by_pay = {}
@@ -230,6 +232,7 @@ def _reconstruct(snapshot, run, tables):
     for row in tables["ledger"]:
         event_id, kind, ident, day = (row[key] for key in ("event_id", "kind", "instrument_id", "session"))
         if kind in ("buy", "sell"):
+            trade_days.add(day)
             if kind == "sell" and day in buy_days:
                 raise ReplayError("sale recorded after a buy in the same session")
             if kind == "buy":
@@ -264,6 +267,9 @@ def _reconstruct(snapshot, run, tables):
                 raise ReplayError("fill quantity must be a positive integer")
             if quantity % int(run["config"]["lot"]) or quantity > order["capacity_shares"]:
                 raise ReplayError("fill violates lot or capacity")
+            filled_by_order[order["order_id"]] = filled_by_order.get(order["order_id"], 0) + quantity
+            if filled_by_order[order["order_id"]] > order["quantity"]:
+                raise ReplayError("fill exceeds order quantity")
             price = Decimal(fill["price"])
             reference = Decimal(fill["reference_price"])
             cost_rate = (Decimal(run["config"]["half_spread_bps"]) + Decimal(run["config"]["slippage_bps"])) / 10000
@@ -305,7 +311,12 @@ def _reconstruct(snapshot, run, tables):
         elif kind in ("split", "dividend_ex", "unresolved_delisting", "delisting_ex"):
             if event_id in seen_actions or event_id not in actions:
                 raise ReplayError(f"ledger: duplicate or unknown action {event_id}")
+            if day in trade_days:
+                raise ReplayError("corporate action recorded after trading")
             action = actions[event_id]
+            if (datetime.fromisoformat(action["available_at"].replace("Z", "+00:00")) >
+                    datetime.fromisoformat(calendar[day]["open_at"].replace("Z", "+00:00"))):
+                raise ReplayError(f"late corporate action {event_id}")
             _require((ident, day), (action["instrument_id"], action["ex_session"]), "action identity")
             expected_kind = {"split": "split", "dividend": "dividend_ex",
                              "delisting": "delisting_ex" if "exit_cash_per_share" in action
@@ -332,10 +343,13 @@ def _reconstruct(snapshot, run, tables):
             _require(Decimal(row["cash_delta"]), Decimal(0), "action cash delta")
             seen_actions.add(event_id)
         elif kind in ("dividend_pay", "delisting_pay"):
+            if day in trade_days:
+                raise ReplayError("payment recorded after trading")
             action_id = event_id.removesuffix("-pay")
             if action_id not in receivables:
                 raise ReplayError(f"payment without receivable: {event_id}")
-            _require(day, actions[action_id]["pay_session"], "payment session")
+            _require((ident, day), (actions[action_id]["instrument_id"],
+                                    actions[action_id]["pay_session"]), "payment identity")
             _require(kind, "delisting_pay" if actions[action_id]["kind"] == "delisting"
                      else "dividend_pay", "payment kind")
             amount = receivables.pop(action_id)
@@ -348,15 +362,37 @@ def _reconstruct(snapshot, run, tables):
         _require(Decimal(row["cash_brl"]), cash, "ledger cash")
         _require(Decimal(row["receivable_brl"]), sum(receivables.values(), Decimal(0)), "ledger receivables")
     _require(seen_fills, set(fills), "ledger fill coverage")
+    cancellations = {}
+    for action in actions.values():
+        if action["kind"] in ("split", "delisting"):
+            cancellations.setdefault(action["instrument_id"], []).append(action)
     for state in tables["order_states"]:
         order = orders[state["order_id"]]
-        filled = sum(f["quantity"] for f in fills.values() if f["order_id"] == state["order_id"])
+        filled = filled_by_order.get(state["order_id"], 0)
+        _require(state["instrument_id"], order["instrument_id"], "order state identity")
         _require(state["filled"], filled, "order filled")
         _require(state["remaining"], order["quantity"] - filled, "order remaining")
-        if state["status"] not in ("FILLED", "EXPIRED", "CANCELLED"):
-            raise ReplayError("invalid terminal order status")
-        if state["status"] == "FILLED" and state["remaining"] != 0:
-            raise ReplayError("filled order has remaining quantity")
+        expected_status, expected_reason = ("FILLED", "complete") if filled == order["quantity"] else (
+            "EXPIRED", "expiry_session_reached")
+        earliest = datetime.fromisoformat(order["earliest_execution_at"].replace("Z", "+00:00"))
+        for action in sorted(cancellations.get(order["instrument_id"], ()),
+                             key=lambda a: (a["ex_session"], a["kind"] != "split", a["action_id"])):
+            ex_day = action["ex_session"]
+            ex_open = datetime.fromisoformat(calendar[ex_day]["open_at"].replace("Z", "+00:00"))
+            available = datetime.fromisoformat(action["available_at"].replace("Z", "+00:00"))
+            if ex_day not in nav_days or ex_open < earliest or ex_day > order["expiry_session"]:
+                continue
+            order_fills = [f for f in fills.values() if f["order_id"] == order["order_id"]]
+            before = sum(f["quantity"] for f in order_fills if f["session"] < ex_day)
+            if before < order["quantity"]:
+                if available > ex_open:
+                    raise ReplayError(f"late corporate action {action['action_id']}")
+                if any(f["session"] >= ex_day for f in order_fills):
+                    raise ReplayError("fill after order cancellation")
+                expected_status, expected_reason = "CANCELLED", f"{action['kind']}_requires_new_order"
+                break
+        _require(state["status"], expected_status, "terminal order status")
+        _require(state["reason"], expected_reason, "terminal order reason")
     _require({s["order_id"] for s in tables["order_states"]}, set(orders), "order state coverage")
     _require(len(tables["order_states"]), len(orders), "order state count")
     results = []
