@@ -118,6 +118,11 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
             book.unresolved.add(row["instrument_id"])
         previous_due = row["receivable_brl"]
     first_day = first["nav"][0]["session"]
+    # Actions with no entitlement also count as processed, even though they
+    # produce no ledger row. Buying on/after their ex-date creates no right.
+    book.processed.update(action["action_id"] for action in snapshot.available(
+        "actions", first["nav"][-1]["valued_at"])
+        if first_day <= action["ex_session"] <= first["nav"][-1]["session"])
     if sum(book.receivables.values(), Decimal(0)) != first["nav"][-1]["receivable_brl"]:
         raise ValueError("opening receivables do not reconcile")
     bridge = [s for s in snapshot.payload["calendar"]["sessions"]

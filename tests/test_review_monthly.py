@@ -75,6 +75,18 @@ class MonthlyReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'monthly formation has incomplete NAV'):
             run_f1_monthly(parse_snapshot(self.payload), decision_ats=DECISIONS)
 
+    def test_action_without_opening_position_is_not_applied_in_next_cycle(self):
+        dividend = dict(next(a for a in self.payload['actions'] if a['kind'] == 'dividend'),
+                        action_id='NO-ENTITLEMENT', ex_session='2025-02-03',
+                        pay_session='2025-02-10', announced_at='2025-01-31T18:00:00Z',
+                        observed_at='2025-01-31T18:00:00Z', available_at='2025-01-31T18:01:00Z',
+                        ingested_at='2025-01-31T18:02:00Z')
+        self.payload['actions'].append(dividend)
+        snapshot = parse_snapshot(self.payload)
+        result = run_f1_monthly(snapshot, decision_ats=DECISIONS)
+        self.assertFalse(any(r['event_id'].startswith('NO-ENTITLEMENT') for r in result['ledger']))
+        self.assertEqual(self.replay(snapshot, result)['cash_brl'], result['nav'][-1]['cash_brl'])
+
     def test_late_action_crossing_execution_boundary_is_rejected(self):
         late = dict(self.payload['actions'][0], action_id='LATE-BOUNDARY',
                     ex_session='2025-02-05', announced_at='2025-02-06T12:00:00Z',
