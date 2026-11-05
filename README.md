@@ -1,22 +1,22 @@
 # Quant Trading Research Engine
 
-Motor de pesquisa quantitativa para testar, futuramente, momentum cross-sectional 12–2 em ações B3. A [especificação técnica](docs/especificacao-tecnica.md) define os contratos do motor; o [plano de competências e entregas](docs/roadmap-competencias.md) organiza a evolução como projeto de portfólio. Há um protótipo sintético de sinal, execução e contabilidade e uma sondagem exploratória via yfinance. Ainda não há backtest validado com dados B3.
+A quantitative research engine for investigating 12–2 cross-sectional momentum in B3 equities. The [technical specification](docs/especificacao-tecnica.md) defines the engine contracts, and the [research roadmap](docs/roadmap-competencias.md) tracks the planned work. The repository currently contains synthetic signal, execution, accounting, and independent replay examples, plus an exploratory `yfinance` data probe. **There is no validated backtest using B3 market data.**
 
-## Estado: F1 parcial — duas formações sintéticas
+## Current status: synthetic F1 research prototype
 
-O parser em `src/qtre/data/snapshot.py` valida snapshots JSON de esquema `1` e calcula SHA-256 dos bytes JSON canônicos (chaves ordenadas, sem espaços). Entradas com o mesmo conteúdo produzem o mesmo hash. Os registros são congelados após a leitura. O calendário é uma lista explícita de sessões sintéticas no fuso `America/Sao_Paulo`; seus horários UTC não representam um calendário oficial da B3.
+The parser in `src/qtre/data/snapshot.py` validates schema-1 JSON snapshots and computes SHA-256 over canonical JSON bytes (sorted keys, no whitespace). Identical content yields the same hash, and parsed records are frozen. The calendar is an explicit list of synthetic sessions in `America/Sao_Paulo`; its UTC times are not an official B3 calendar.
 
-Contratos incluídos: `PriceBar` bruto, `OpenEvent`, `CorporateAction`, `UniverseMembership` e histórico de ticker por `instrument_id`. Cada registro tem origem e os três relógios `observed_at`, `available_at` e `ingested_at`. `Snapshot.available(collection, as_of)` retorna somente registros conhecidos até o corte. O parser rejeita chaves ou registros duplicados, timestamps sem fuso, OHLC inválido, intervalos sobrepostos, barras completas antes do fechamento e dados posteriores ao `as_of` do snapshot.
+The data contracts include raw `PriceBar` records, `OpenEvent`, `CorporateAction`, `UniverseMembership`, and ticker history keyed by `instrument_id`. Each record includes provenance and three timestamps: `observed_at`, `available_at`, and `ingested_at`. `Snapshot.available(collection, as_of)` returns only records known by the cutoff. The parser rejects duplicate keys or records, timezone-naive timestamps, invalid OHLC values, overlapping intervals, complete bars before the close, and data later than the snapshot's `as_of`.
 
-As fixtures F0 em `examples/` são pequenas e controladas. A F1 acrescenta `synthetic_f1_v1.json`, com 14 meses e cinco instrumentos fictícios. `qtre.universe.listed_members` reconstrói membros datados; `qtre.signals.momentum_12_2` aplica o corte de disponibilidade e calcula o score. `qtre.backtest.run_f1` demonstra uma formação mensal, ordens para a abertura seguinte, fills com custos hipotéticos, split, dividendo, suspensão, livro e NAV. O [contrato sintético da F1](docs/contrato-f1-sintetico.md) fixa entradas e valores esperados. Isto verifica a mecânica do software; não mede desempenho de ações brasileiras.
+The small F0 fixtures in `examples/` test these contracts. F1 adds `synthetic_f1_v1.json`, with 14 months and five fictional instruments. `qtre.universe.listed_members` reconstructs dated membership, and `qtre.signals.momentum_12_2` applies the availability cutoff and calculates scores. `qtre.backtest.run_f1` demonstrates one monthly decision, orders for the next open, fills with hypothetical costs, a split, a dividend, a suspension, accounting entries, and NAV. The [synthetic F1 contract](docs/contrato-f1-sintetico.md) specifies the inputs and expected values. These examples verify software mechanics, not Brazilian equity performance.
 
-`qtre.reporting.write_f1_run` grava uma execução em diretório novo escolhido pelo chamador; `qtre.reporting.replay_f1` valida hashes e reconstrói caixa, posições, recebíveis e NAV lendo apenas os arquivos, sem executar `run_f1`. O [esquema dos artefatos F1](docs/artefatos-f1-v1.md) descreve formato, limites e conciliação. Exemplo sintético:
+`qtre.reporting.write_f1_run` writes a run to a new caller-selected directory. `qtre.reporting.replay_f1` verifies hashes and reconstructs cash, positions, receivables, and NAV from the saved files without calling `run_f1`. See the [F1 artifact schema](docs/artefatos-f1-v1.md) for file formats and reconciliation rules.
 
 ```python
 from datetime import datetime, timezone
 from qtre.backtest import run_f1
 from qtre.data.snapshot import load_snapshot
-from qtre.reporting import write_f1_run, replay_f1
+from qtre.reporting import replay_f1, write_f1_run
 
 snapshot = load_snapshot("examples/synthetic_f1_v1.json")
 result = run_f1(snapshot, decision_at=datetime(2025, 1, 31, 20, 7, tzinfo=timezone.utc))
@@ -24,45 +24,32 @@ write_f1_run(snapshot, result, "/tmp/qtre-f1-example")
 reconstructed = replay_f1("/tmp/qtre-f1-example")
 ```
 
-A [segunda formação sintética](docs/contrato-f1-segunda-formacao.md) acrescenta
-uma venda, compras após a venda e NAV conciliado. `run_f1_two_formations`
-executa as decisões de 31/01 e 28/02 na fixture
-`synthetic_f1_rebalance_v1.json`; os artefatos usam o
-[esquema 2](docs/artefatos-f1-v2.md) e o mesmo `replay_f1` os reconstrói sem
-executar o motor. Este é um exemplo de duas decisões, ainda sem ciclo mensal
-geral.
+The [second synthetic formation](docs/contrato-f1-segunda-formacao.md) adds a sale, purchases after that sale, and reconciled NAV. `run_f1_two_formations` runs the January 31 and February 28 decisions on `synthetic_f1_rebalance_v1.json`. Saved runs can be replayed independently. The [intermediate-session contract](docs/contrato-f1-sessoes-intermediarias.md) extends this example with daily marks and corporate actions between decisions, including a dividend receivable carried until payment; see [artifact schema 3](docs/artefatos-f1-v3.md). For the two-decision example, pass the dates from the [manual contract](docs/contrato-f1-segunda-formacao.md) as `first_decision_at` and `second_decision_at`, then pass the result to `write_f1_run` and its output directory to `replay_f1`.
 
-Para reproduzir a continuação, use `run_f1_two_formations(snapshot,
-first_decision_at=..., second_decision_at=...)` com as datas do
-[exemplo manual](docs/contrato-f1-segunda-formacao.md), depois passe seu
-resultado a `write_f1_run` e o diretório criado a `replay_f1`.
+A [third-formation contract](docs/contrato-f1-terceira-formacao.md) and synthetic fixture describe a March decision. A local monthly-cycle implementation is under development; the stable documented examples above remain the reference for completed F1 behavior. General monthly processing and explicit resolved-delisting rules are still pending. Choose a new output directory for each run: artifact writing refuses to silently replace an existing directory.
 
-Escolha outro diretório quando o anterior já existir: a gravação recusa substituição silenciosa.
+## Run the validation suite
 
-## Executar a validação
-
-Requer Python 3.10+; o núcleo e a suíte de testes usam apenas a biblioteca padrão. A consulta real é uma dependência opcional.
+Python 3.10+ is required. The core engine and tests use only the standard library; live data probing is optional.
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 PYTHONPATH=src python3 -c 'from qtre import load_snapshot; print(load_snapshot("examples/synthetic_normal_v1.json").content_hash)'
 ```
 
-Para regenerar as fixtures: `python3 examples/generate_fixtures.py`, `python3 examples/generate_f1_fixture.py` e `python3 examples/generate_f1_rebalance_fixture.py`. Cada script sobrescreve somente seus próprios arquivos JSON sintéticos em `examples/`.
+To regenerate synthetic fixtures, run `python3 examples/generate_fixtures.py`, `python3 examples/generate_f1_fixture.py`, and `python3 examples/generate_f1_rebalance_fixture.py`. Each script overwrites only its own synthetic JSON files in `examples/`. The F1 fixture uses one record per line to ease review without changing its canonical content. The [November 4, 2026 review](docs/revisao-f1-2026-11-04.md) records previously corrected failures.
 
-A fixture F1 grava um registro por linha para facilitar revisão sem alterar seu conteúdo canônico. Veja a [revisão de 04/11/2026](docs/revisao-f1-2026-11-04.md) para falhas corrigidas anteriormente. A F1 agora demonstra uma venda e uma segunda decisão sintética, mas ainda não possui repetição mensal geral.
+A snapshot hash identifies validated content. It does not establish vendor authenticity, data rights, an official calendar, or freedom from bias. Those concerns belong to later research and data-integration phases.
 
-O hash identifica o conteúdo validado do snapshot. Ele não demonstra autenticidade de fornecedor, licença de dados, calendário oficial ou ausência de viés; esses pontos pertencem às fases F3/F4.
+## Exploratory `yfinance` probe
 
-## Sondagem exploratória com yfinance
-
-O adaptador opcional consulta OHLC do fornecedor, volume, dividendos e splits via `yfinance` e imprime um resumo de cobertura, sem gravar preços no repositório. `auto_adjust=False` desativa o ajuste automático adicional da biblioteca; não certifica que os valores sejam os preços originais negociados:
+The optional adapter requests vendor OHLC data, volume, dividends, and splits, then prints a coverage summary without saving market prices in this repository. `auto_adjust=False` disables additional automatic adjustment by the library; it does not certify that returned values are original traded prices.
 
 ```bash
 pip install -e '.[yahoo]'
 PYTHONPATH=src python3 -m qtre.data.yfinance_probe --start 2024-01-01 --end 2025-03-01
 ```
 
-Por padrão, consulta `PETR4.SA`, `VALE3.SA`, `ITUB4.SA`, `BBDC4.SA` e `ABEV3.SA`. O intervalo final é exclusivo. `keepna=True` preserva as linhas faltantes retornadas pelo fornecedor para auditoria. A saída verifica finitude/coerência OHLC, volumes, ações, duplicatas, ordenação e datas fora do intervalo. Volume zero recebe `REVIEW`; dado inválido recebe `INCOMPLETE`; falha de consulta recebe `FETCH_ERROR`. O comando termina com código 2 em caso de falha ou dados incompletos.
+By default, the probe requests `PETR4.SA`, `VALE3.SA`, `ITUB4.SA`, `BBDC4.SA`, and `ABEV3.SA`. The end date is exclusive. `keepna=True` preserves missing rows returned by the vendor for review. Output checks OHLC finiteness and consistency, volume, corporate actions, duplicates, ordering, and dates outside the requested interval. Zero volume is marked `REVIEW`, invalid data `INCOMPLETE`, and request failures `FETCH_ERROR`. The command exits with code 2 on a failed request or incomplete data.
 
-A contagem de linhas não comprova cobertura de um calendário oficial. O adaptador **não** cria `Snapshot` causal nem alimenta o backtest F1: a resposta histórica não fornece `available_at` e revisões por registro, calendário oficial versionado, universo histórico com saídas ou evento de abertura com horário de publicação verificado. A coorte de cinco tickers foi escolhida hoje e não demonstra ausência de viés de sobrevivência.
+A row count cannot establish coverage against an official exchange calendar. The probe does **not** create a causal `Snapshot` or feed the F1 backtest. Its historical response does not provide per-record `available_at` timestamps and revisions, a versioned official calendar, a historical universe including delistings, or opening events with verified publication times. The five-ticker cohort was selected in the present and does not rule out survivorship bias.
