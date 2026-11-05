@@ -7,7 +7,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from qtre.data.snapshot import Snapshot, load_snapshot
+from qtre.data.snapshot import Snapshot, parse_snapshot
 from qtre.universe import listed_members
 
 
@@ -122,7 +122,7 @@ def replay_f1(directory: str | Path) -> dict:
             raw = (root / name).read_bytes()
             _require(sha256(raw).hexdigest(), envelope["files"][name], f"{name} SHA-256")
             data[name] = raw
-        snapshot = load_snapshot(root / "snapshot.json")
+        snapshot = parse_snapshot(_load_json(data["snapshot.json"], "snapshot.json"))
         _require(snapshot.content_hash, run["snapshot_hash"], "snapshot hash")
         _require(snapshot.calendar_id, run["calendar_id"], "calendar")
         tables = {}
@@ -219,6 +219,7 @@ def _reconstruct(snapshot, run, tables):
     buy_days = set()
     trade_days = set()
     filled_by_order = {}
+    fills_by_order = {}
     actions = {row["action_id"]: row for row in snapshot.payload["actions"]}
     actions_by_ex = {}
     actions_by_pay = {}
@@ -246,9 +247,9 @@ def _reconstruct(snapshot, run, tables):
             if kind == "sell" or "side" in fill:
                 _require(fill["side"], kind, "fill side")
             _require(fill["source_key"], f"open:{ident}:{day}", "fill source")
-            open_at = next(s["open_at"] for s in snapshot.payload["calendar"]["sessions"] if s["session"] == day)
-            opening = next(o for o in snapshot.available("opens", datetime.fromisoformat(open_at.replace("Z", "+00:00")))
-                           if o["instrument_id"] == ident and o["session"] == day)
+            open_at = calendar[day]["open_at"]
+            opening = next(o for o in snapshot.available("opens", datetime.fromisoformat(open_at.replace("Z", "+00:00")), session=day)
+                           if o["instrument_id"] == ident)
             if not opening["tradable"] or ident not in listed_members(
                 snapshot, day, as_of=datetime.fromisoformat(open_at.replace("Z", "+00:00"))):
                 raise ReplayError("fill during suspended or untradable opening")
@@ -267,6 +268,7 @@ def _reconstruct(snapshot, run, tables):
                 raise ReplayError("fill quantity must be a positive integer")
             if quantity % int(run["config"]["lot"]) or quantity > order["capacity_shares"]:
                 raise ReplayError("fill violates lot or capacity")
+            fills_by_order.setdefault(order["order_id"], []).append(fill)
             filled_by_order[order["order_id"]] = filled_by_order.get(order["order_id"], 0) + quantity
             if filled_by_order[order["order_id"]] > order["quantity"]:
                 raise ReplayError("fill exceeds order quantity")
@@ -382,7 +384,7 @@ def _reconstruct(snapshot, run, tables):
             available = datetime.fromisoformat(action["available_at"].replace("Z", "+00:00"))
             if ex_day not in nav_days or ex_open < earliest or ex_day > order["expiry_session"]:
                 continue
-            order_fills = [f for f in fills.values() if f["order_id"] == order["order_id"]]
+            order_fills = fills_by_order.get(order["order_id"], ())
             before = sum(f["quantity"] for f in order_fills if f["session"] < ex_day)
             if before < order["quantity"]:
                 if available > ex_open:
@@ -444,7 +446,7 @@ def _reconstruct(snapshot, run, tables):
                 historical_unresolved.add(ident)
             elif kind in ("dividend_pay", "delisting_pay"):
                 cash += receivables.pop(event_id.removesuffix("-pay"))
-        closes = {bar["instrument_id"]: bar for bar in snapshot.available("bars", valued_at) if bar["session"] == day}
+        closes = {bar["instrument_id"]: bar for bar in snapshot.available("bars", valued_at, session=day)}
         missing = sorted(ident for ident, quantity in positions.items()
                          if quantity and (ident not in closes or ident in historical_unresolved))
         marks = {ident: {"quantity": quantity, "price": str(closes[ident]["close"]), "source_key": f"bar:{ident}:{day}"}

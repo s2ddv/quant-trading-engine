@@ -207,7 +207,7 @@ def _run(snapshot, decision_at, config, formation_session):
         close_cut = instant(session["close_at"]) + timedelta(minutes=config.mark_delay_minutes)
         book.actions(snapshot, day, open_at, first_day, states)
         members = set(listed_members(snapshot, day, as_of=open_at))
-        opens = {r["instrument_id"]: r for r in snapshot.available("opens", open_at) if r["session"] == day}
+        opens = {r["instrument_id"]: r for r in snapshot.available("opens", open_at, session=day)}
         for order in orders:
             state = states[order["order_id"]]
             if state["status"] != "PENDING":
@@ -239,7 +239,7 @@ def _run(snapshot, decision_at, config, formation_session):
         # Detect late corporate actions when they become known, never by looking
         # ahead at the entire snapshot while constructing earlier orders.
         book.actions(snapshot, day, close_cut, first_day, states)
-        closes = {r["instrument_id"]: r for r in snapshot.available("bars", close_cut) if r["session"] == day}
+        closes = {r["instrument_id"]: r for r in snapshot.available("bars", close_cut, session=day)}
         missing = sorted(ident for ident, quantity in book.positions.items()
                          if quantity and (ident not in closes or ident in book.unresolved))
         marks = {ident: dict(quantity=quantity, price=Decimal(str(closes[ident]["close"])),

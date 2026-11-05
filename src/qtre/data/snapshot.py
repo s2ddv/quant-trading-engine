@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
-from functools import lru_cache
+from functools import cached_property, lru_cache
 import json
 from pathlib import Path
 from types import MappingProxyType
@@ -143,12 +143,30 @@ class Snapshot:
         if as_of > self.as_of:
             raise SnapshotError("as_of: later than frozen snapshot")
 
-    def available(self, collection: str, as_of: datetime) -> tuple[Mapping[str, Any], ...]:
-        """Return source records available by a decision instant; never mutate them."""
+    @cached_property
+    def _session_index(self):
+        # Keep references to immutable rows, not another copy of the dataset.
+        collections = {}
+        for name in ("bars", "opens"):
+            days = {}
+            for row in self.payload[name]:
+                days.setdefault(row["session"], []).append(row)
+            collections[name] = MappingProxyType({day: tuple(rows) for day, rows in days.items()})
+        return MappingProxyType(collections)
+
+    def available(self, collection: str, as_of: datetime, *,
+                  session: str | None = None) -> tuple[Mapping[str, Any], ...]:
+        """Return known records, optionally restricting bars/opens to one session."""
         self.check_as_of(as_of)
         if collection not in ("bars", "opens", "actions", "memberships", "symbols"):
             raise SnapshotError(f"unknown collection: {collection}")
-        return tuple(row for row in self.payload[collection] if _instant(row["available_at"], "available_at") <= as_of)
+        if session is not None:
+            if collection not in ("bars", "opens"):
+                raise SnapshotError("session filter requires bars or opens")
+            rows = self._session_index[collection].get(session, ())
+        else:
+            rows = self.payload[collection]
+        return tuple(row for row in rows if _instant(row["available_at"], "available_at") <= as_of)
 
 
 def parse_snapshot(payload: Any) -> Snapshot:

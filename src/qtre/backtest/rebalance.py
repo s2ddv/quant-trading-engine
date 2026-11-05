@@ -17,8 +17,7 @@ MONTHLY_MODEL = "synthetic-f1-monthly-v2"
 
 
 def _mark(snapshot, book, day, valued_at):
-    closes = {row["instrument_id"]: row for row in snapshot.available("bars", valued_at)
-              if row["session"] == day}
+    closes = {row["instrument_id"]: row for row in snapshot.available("bars", valued_at, session=day)}
     missing = sorted(ident for ident, quantity in book.positions.items()
                      if quantity and (ident not in closes or ident in book.unresolved))
     marks = {ident: dict(quantity=quantity, price=Decimal(str(closes[ident]["close"])),
@@ -186,7 +185,7 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
         valued_at = instant(session["close_at"]) + timedelta(minutes=config.mark_delay_minutes)
         book.actions(snapshot, trade_day, open_at, first_day, states)
         members = set(listed_members(snapshot, trade_day, as_of=open_at))
-        opens = {r["instrument_id"]: r for r in snapshot.available("opens", open_at) if r["session"] == trade_day}
+        opens = {r["instrument_id"]: r for r in snapshot.available("opens", open_at, session=trade_day)}
         for order in sorted(orders, key=lambda o: (o["side"] != "sell", o["order_id"])):
             state = states[order["order_id"]]
             if state["status"] != "PENDING":
