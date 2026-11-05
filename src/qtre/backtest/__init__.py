@@ -244,7 +244,7 @@ def _run(snapshot, decision_at, config, formation_session):
                          if quantity and (ident not in closes or ident in book.unresolved))
         marks = {ident: dict(quantity=quantity, price=Decimal(str(closes[ident]["close"])),
                              source_key=f"bar:{ident}:{day}") for ident, quantity in book.positions.items()
-                 if ident in closes and ident not in book.unresolved}
+                 if quantity and ident in closes and ident not in book.unresolved}
         value = money(sum((r["quantity"] * r["price"] for r in marks.values()), Decimal(0)))
         receivable = sum(book.receivables.values(), Decimal(0))
         nav.append(dict(session=day, valued_at=close_cut, status="NAV_INCOMPLETO" if missing else "COMPLETE",

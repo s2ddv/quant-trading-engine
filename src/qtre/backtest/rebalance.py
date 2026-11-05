@@ -90,8 +90,6 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
         raise ValueError("each formation must be in the next calendar month")
     if day <= first["nav"][-1]["session"]:
         raise ValueError("monthly formation overlaps the prior execution window")
-    if first["nav"][-1]["status"] != "COMPLETE":
-        raise ValueError("monthly formation requires a complete opening NAV")
 
     sessions = [s for s in snapshot.payload["calendar"]["sessions"]
                 if instant(s["open_at"]) > second_decision_at][:config.expiry_sessions]
@@ -104,14 +102,22 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
     book = _Book(first["nav"][-1]["cash_brl"])
     book.positions = {ident: row["quantity"] for ident, row in last_by_ident.items() if row["quantity"]}
     book.cost_basis = {ident: row["cost_basis"] for ident, row in last_by_ident.items() if row["quantity"]}
-    actions_by_id = {action["action_id"]: action for action in snapshot.available("actions", second_decision_at)}
-    unpaid = {row["event_id"]: row for row in first["ledger"] if row["kind"] == "dividend_ex"}
+    # Recover outstanding rights from their posted amounts, including exits
+    # whose ledger quantity is already zero. Preserve processed actions across
+    # windows so late publications cannot disappear at a month boundary.
+    previous_due = Decimal(0)
     for row in first["ledger"]:
-        if row["kind"] == "dividend_pay":
-            unpaid.pop(row["event_id"].removesuffix("-pay"), None)
-    book.receivables = {action_id: money(Decimal(row["quantity"]) *
-                                         Decimal(str(actions_by_id[action_id]["cash_per_share"])))
-                        for action_id, row in unpaid.items()}
+        kind, event_id = row["kind"], row["event_id"]
+        if kind in ("dividend_ex", "delisting_ex"):
+            book.receivables[event_id] = row["receivable_brl"] - previous_due
+        elif kind in ("dividend_pay", "delisting_pay"):
+            book.receivables.pop(event_id.removesuffix("-pay"))
+        if kind in ("split", "dividend_ex", "delisting_ex", "unresolved_delisting"):
+            book.processed.add(event_id)
+        if kind == "unresolved_delisting":
+            book.unresolved.add(row["instrument_id"])
+        previous_due = row["receivable_brl"]
+    first_day = first["nav"][0]["session"]
     if sum(book.receivables.values(), Decimal(0)) != first["nav"][-1]["receivable_brl"]:
         raise ValueError("opening receivables do not reconcile")
     bridge = [s for s in snapshot.payload["calendar"]["sessions"]
@@ -124,8 +130,8 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
         snapshot.check_as_of(valued_at)
         if bridge_day == day and valued_at > second_decision_at:
             raise ValueError("monthly decision precedes formation mark")
-        book.actions(snapshot, bridge_day, open_at, bridge[0]["session"], {})
-        book.actions(snapshot, bridge_day, valued_at, bridge[0]["session"], {})
+        book.actions(snapshot, bridge_day, open_at, first_day, {})
+        book.actions(snapshot, bridge_day, valued_at, first_day, {})
         bridge_nav.append(_mark(snapshot, book, bridge_day, valued_at))
     formation_nav = bridge_nav[-1]
     if formation_nav["status"] != "COMPLETE":
@@ -170,7 +176,6 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
                                   remaining=o["quantity"], filled=0, status="PENDING",
                                   reason="awaiting_open") for o in orders}
     fills, nav = [], [formation_nav]
-    first_day = sessions[0]["session"]
     for session in sessions:
         trade_day, open_at = session["session"], instant(session["open_at"])
         valued_at = instant(session["close_at"]) + timedelta(minutes=config.mark_delay_minutes)

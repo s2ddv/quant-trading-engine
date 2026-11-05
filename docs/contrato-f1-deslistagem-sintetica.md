@@ -24,3 +24,13 @@ Sem `exit_cash_per_share`, a deslistagem não tem valor atribuível: a posição
 e a base permanecem, o NAV fica `NAV_INCOMPLETO` e decisões futuras param
 enquanto o valor não for resolvido. O replay deve rejeitar omissão ou
 adulteração de ambos os tipos de evento.
+
+Revisão de 05/11: um recebível de saída pode atravessar várias formações.
+O livro conserva o valor reconhecido na ex-data até o pagamento, inclusive
+quando a quantidade da posição já é zero. O teste com saída após o split
+em 04/02 reconhece `658 × 26 = R$ 17.108,00`, mantém esse valor a receber
+em fevereiro e março e paga uma única vez em 02/04. Posições zeradas não
+aparecem nas marcas de preço. Uma cotação temporariamente ausente mantém o
+NAV daquele dia incompleto, mas permite continuar se a formação seguinte
+tiver avaliação completa. Uma saída ainda sem valor continua bloqueando a
+nova decisão. Publicações tardias não são ignoradas na troca de janela.
