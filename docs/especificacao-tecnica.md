@@ -106,7 +106,7 @@ Cada execução recebe `run_id` derivado de configuração canônica, código/co
 
 **Implementação parcial da persistência F1 sintética (04/11/2026):** o [esquema de artefatos v1](artefatos-f1-v1.md) fixa `snapshot.json`, `manifest.json`, `orders.jsonl`, `order_states.jsonl`, `fills.jsonl`, `ledger.jsonl` e `nav.jsonl`. O replay lê esses arquivos, verifica os hashes e reconstrói livro e NAV sem invocar o motor. As demais saídas propostas acima, incluindo sinais e métricas, continuam fora deste corte. O `run_id` existente combina parâmetros, modelo, código, Python e hash do snapshot; os hashes dos artefatos ficam no envelope do manifesto.
 
-**Continuação F1:** a [segunda formação sintética](contrato-f1-segunda-formacao.md) usa o [esquema de artefatos v2](artefatos-f1-v2.md) para venda, base removida e lucro realizado. O replay independente aceita v1 e v2. A continuidade mensal geral, ações corporativas no intervalo entre formações e validação de pesquisa permanecem pendentes.
+**Continuação F1:** a [segunda formação sintética](contrato-f1-segunda-formacao.md) introduziu venda, base removida e lucro realizado. As [sessões intermediárias](contrato-f1-sessoes-intermediarias.md), a [terceira formação](contrato-f1-terceira-formacao.md) e a [deslistagem sintética](contrato-f1-deslistagem-sintetica.md) completam o ciclo mensal controlado. O replay independente aceita os [esquemas 1 a 5](artefatos-f1-v5.md). Validação de pesquisa, dados B3 e regras reais de liquidação permanecem pendentes.
 
 Um ID de consulta ou URL de fornecedor não congela dados. Se a licença impedir armazenar o snapshot, registrar hash, intervalo, versão, método e data de extração, mas declarar que terceiros **não conseguem reproduzir exatamente** sem acesso ao mesmo conteúdo. Revisões do fornecedor, ajustes retroativos e mudança de calendário podem alterar resultados; um novo snapshot vira outro `run_id`.
 
@@ -205,7 +205,7 @@ Cada fase depende da anterior; as entradas e saídas indicadas tornam os critér
 | Unitário: custos/execução | Ordem, abertura, spread/slippage/tarifa fixos, caixa justo | Fill e custo por rubrica exatos; compra insuficiente é reduzida/rejeitada; sem execução no mesmo fechamento. |
 | Unitário: limites | Ranking com empate, lote 100, teto 10%, suspensão | Desempate estável; pesos e quantidades respeitam tetos/lote; suspenso não recebe fill. |
 | Unitário: ausências | Barra faltante na janela, preço faltante em posição, universo tardio | Ativo inelegível; NAV_INCOMPLETO; membro tardio invisível até disponibilidade. |
-| Integração: livro | Fixture de compra, venda parcial, taxa, provento e deslistagem resolvida | Livro, posições, recebíveis e NAV batem com planilha manual de valores esperados. |
+| Integração: livro | Fixture sintética de compra, venda total/parcial, taxa, provento e deslistagem com valor declarado | Livro, posições, recebíveis e NAV batem com exemplos manuais; deslistagem sem valor mantém NAV incompleto. |
 | Integração: replay | Snapshot + manifesto + eventos preservados | Reexecução offline gera mesmo run hash e série NAV; alteração de um byte invalida hash ou muda run_id. |
 | Propriedade: conservação | Sequências geradas de ordens e splits válidos | Caixa nunca negativo, quantidade nunca negativa, fills ≤ ordens, `NAV` concilia em toda sessão completa. |
 | Propriedade: monotonicidade de custo | Mesmos fills e preços, custos crescentes | NAV líquido final não cresce; explicitar que fills variáveis invalidam esta propriedade. |

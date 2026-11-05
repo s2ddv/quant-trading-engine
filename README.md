@@ -26,7 +26,21 @@ reconstructed = replay_f1("/tmp/qtre-f1-example")
 
 The [second synthetic formation](docs/contrato-f1-segunda-formacao.md) adds a sale, purchases after that sale, and reconciled NAV. `run_f1_two_formations` runs the January 31 and February 28 decisions on `synthetic_f1_rebalance_v1.json`. Saved runs can be replayed independently. The [intermediate-session contract](docs/contrato-f1-sessoes-intermediarias.md) extends this example with daily marks and corporate actions between decisions, including a dividend receivable carried until payment; see [artifact schema 3](docs/artefatos-f1-v3.md). For the two-decision example, pass the dates from the [manual contract](docs/contrato-f1-segunda-formacao.md) as `first_decision_at` and `second_decision_at`, then pass the result to `write_f1_run` and its output directory to `replay_f1`.
 
-A [third-formation contract](docs/contrato-f1-terceira-formacao.md) and synthetic fixture describe a March decision. A local monthly-cycle implementation is under development; the stable documented examples above remain the reference for completed F1 behavior. General monthly processing and explicit resolved-delisting rules are still pending. Choose a new output directory for each run: artifact writing refuses to silently replace an existing directory.
+The [third-formation contract](docs/contrato-f1-terceira-formacao.md) fixes the March decision's orders, costs, cash, and NAV by hand. `run_f1_monthly` repeats the causal monthly cycle over a caller-supplied sequence of decisions; a fourth decision is also exercised in tests. [Artifact schema 4](docs/artefatos-f1-v4.md) stores every window for independent replay. A [synthetic delisting contract](docs/contrato-f1-deslistagem-sintetica.md) covers both a declared cash exit and an unresolved exit; the latter keeps NAV incomplete. [Snapshot schema 2](docs/contrato-snapshot-v2.md) and [artifact schema 5](docs/artefatos-f1-v5.md) version the declared cash event. Choose a new output directory for each run: artifact writing refuses to silently replace an existing directory.
+
+```python
+from datetime import datetime, timezone
+from qtre.backtest import run_f1_monthly
+from qtre.data.snapshot import load_snapshot
+from qtre.reporting import replay_f1, write_f1_run
+
+snapshot = load_snapshot("examples/synthetic_f1_monthly_v1.json")
+decisions = tuple(datetime(2025, month, day, 20, 7, tzinfo=timezone.utc)
+                  for month, day in ((1, 31), (2, 28), (3, 31)))
+result = run_f1_monthly(snapshot, decision_ats=decisions)
+write_f1_run(snapshot, result, "/tmp/qtre-f1-monthly-example")
+reconstructed = replay_f1("/tmp/qtre-f1-monthly-example")
+```
 
 ## Run the validation suite
 
@@ -37,7 +51,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 PYTHONPATH=src python3 -c 'from qtre import load_snapshot; print(load_snapshot("examples/synthetic_normal_v1.json").content_hash)'
 ```
 
-To regenerate synthetic fixtures, run `python3 examples/generate_fixtures.py`, `python3 examples/generate_f1_fixture.py`, and `python3 examples/generate_f1_rebalance_fixture.py`. Each script overwrites only its own synthetic JSON files in `examples/`. The F1 fixture uses one record per line to ease review without changing its canonical content. The [November 4, 2026 review](docs/revisao-f1-2026-11-04.md) records previously corrected failures.
+To regenerate synthetic fixtures, run `python3 examples/generate_fixtures.py`, `python3 examples/generate_f1_fixture.py`, `python3 examples/generate_f1_rebalance_fixture.py`, and `python3 examples/generate_f1_monthly_fixture.py`. Each script overwrites only its own synthetic JSON files in `examples/`. The F1 fixture uses one record per line to ease review without changing its canonical content. The [November 4, 2026 review](docs/revisao-f1-2026-11-04.md) records previously corrected failures.
 
 A snapshot hash identifies validated content. It does not establish vendor authenticity, data rights, an official calendar, or freedom from bias. Those concerns belong to later research and data-integration phases.
 
