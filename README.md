@@ -1,6 +1,6 @@
 # Quant Trading Research Engine
 
-A quantitative research engine for investigating 12–2 cross-sectional momentum in B3 equities. The [technical specification](docs/especificacao-tecnica.md) defines the engine contracts, and the [research roadmap](docs/roadmap-competencias.md) tracks the planned work. The repository currently contains synthetic signal, execution, accounting, and independent replay examples, plus an exploratory `yfinance` data probe. **There is no validated backtest using B3 market data.**
+A quantitative research engine for investigating 12–2 cross-sectional momentum in B3 equities, with a planned supervised ML study to test whether a learned ranking improves the momentum baseline after costs. The [technical specification](docs/especificacao-tecnica.md) defines the engine contracts, and the [research roadmap](docs/roadmap-competencias.md) tracks the planned work. The repository currently contains synthetic signal, execution, accounting, and independent replay examples, plus an exploratory `yfinance` data probe. **There is no validated backtest using B3 market data or trained ML model.**
 
 ## Current status: synthetic F1 complete; F2 validation starting
 

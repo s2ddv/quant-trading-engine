@@ -2,13 +2,13 @@
 
 ## Tese do projeto
 
-Construir uma plataforma reproduzível para investigar estratégias em ações brasileiras. O estudo inicial pergunta se momentum cross-sectional 12–2, em uma carteira long-only, supera um benchmark investível **após custos**, fora da amostra. O resultado pode ser negativo: a entrega é a qualidade da pesquisa e da engenharia, não uma promessa de lucro.
+Construir uma plataforma reproduzível para investigar estratégias em ações brasileiras. O estudo inicial pergunta se momentum cross-sectional 12–2, em uma carteira long-only, supera um benchmark investível **após custos**, fora da amostra. Depois, uma extensão com aprendizado de máquina (ML) testará se um ranking supervisionado acrescenta valor ao momentum sob o mesmo universo, execução e custos. O resultado de qualquer comparação pode ser negativo: a entrega é a qualidade da pesquisa e da engenharia, não uma promessa de lucro.
 
 A conversa “Análise de projetos Quant” originou a direção de portfólio: reunir pesquisa quantitativa, backtesting rigoroso, validação estatística e integração com o projeto Monte Carlo GBM. Este documento transforma essa direção em entregas verificáveis. A [especificação técnica](especificacao-tecnica.md) permanece como contrato detalhado do motor.
 
 ## Objetivos e metas
 
-**Objetivo principal:** publicar um estudo reproduzível que permita a outra pessoa verificar, passo a passo, uma conclusão sobre momentum 12–2 em ações brasileiras. Uma conclusão de ausência de vantagem também satisfaz o objetivo se o método for sólido.
+**Objetivo principal:** publicar um estudo reproduzível que permita a outra pessoa verificar, passo a passo, a estratégia momentum 12–2 em ações brasileiras e se uma extensão supervisionada de ML melhora seus resultados líquidos fora da amostra. O momentum permanece como referência; ausência de vantagem em qualquer etapa também satisfaz o objetivo se o método for sólido.
 
 | Horizonte | Meta | Critério de conclusão |
 |---|---|---|
@@ -19,7 +19,9 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 | Agora — F2 | Fixar protocolo e controles de validação sintética | Hipótese, universo, custos, controles, métricas e regras de corte documentados antes da análise; auditoria causal reproduzível |
 | Depois — F2 | Avaliar robustez quando houver histórico suficiente | Separação temporal, tentativas registradas, sensibilidade a custos e incerteza com método declarado |
 | Integração | Reusar Monte Carlo como laboratório de risco | Adaptador opcional, parâmetros e seed registrados, cenários comparados com risco histórico |
-| Publicação | Produzir um caso de portfólio defensável | Fonte de dados e direitos auditados, relatório líquido fora da amostra, limites explícitos e instruções de reprodução |
+| Depois dos dados auditados | Validar o momentum como referência em janelas de desenvolvimento e validação | Universo, benchmark e custos comparáveis; tentativas registradas; janela final reservada para comparação com ML |
+| Depois da referência | Avaliar um ranking supervisionado de ML | Fatores e rótulos causais; modelo simples antes de modelos complexos; mesma carteira e execução; avaliação temporal e registro do modelo |
+| Publicação | Comparar referência e ML na janela final reservada | Retorno líquido, risco, giro, custos, incerteza e limites; fonte de dados e direitos auditados; reprodução de ambas as execuções |
 
 ## Forma de trabalho
 
@@ -29,7 +31,7 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 4. **Guardar evidência de cada execução.** Registrar versão do código, hash do snapshot, configuração, seed, calendário, custos e resultado. Relatar separadamente teste sintético, replay e qualquer avaliação com dados reais.
 5. **Revisar e versionar cada marco.** Conferir diff, rodar testes relevantes, comparar a saída com o aceite e atualizar documentação de limitações. Fazer commits periódicos e coesos usando a skill `commit`, após conferir exatamente o que será incluído; informar os hashes e manter push separado. Só então avançar para a fase seguinte. Não alterar parâmetros após consultar o teste final sem registrar uma nova hipótese.
 
-**Fora do escopo imediato:** corretora e ordens reais, previsão por ML, múltiplas estratégias e afirmações de desempenho B3. Essas ideias só entram se acrescentarem evidência à pergunta de pesquisa depois do primeiro backtest auditável.
+**Fora do escopo imediato:** corretora e ordens reais, treino de ML, aprendizado por reforço (RL), múltiplas estratégias e afirmações de desempenho B3. O experimento supervisionado de ML está planejado após dados auditados e uma referência comparável; RL só será considerado se houver uma pergunta sequencial específica, histórico suficiente e avaliação separada.
 
 ## Competência → evidência pública
 
@@ -40,6 +42,7 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 | Quant Trader | Regras de elegibilidade, formação de ordens, latência, lotes, liquidez e custos | Livro de ordens/fills auditável, limites respeitados e sensibilidade a custos e capacidade |
 | Estatística aplicada | Incerteza, múltiplas tentativas, estabilidade temporal e regimes | Intervalos ou bandas com método declarado, número de hipóteses testadas, resultados por subperíodo e controles negativos |
 | Integração de modelos | Cenários de risco com o `quant-simulation-framework` | Adaptador versionado, entrada/saída reproduzível e comparação entre cenários simulados e risco histórico sem chamar simulação de previsão validada |
+| ML aplicado à pesquisa | Ranking supervisionado dos ativos elegíveis, mantendo o momentum como referência | Fatores disponíveis na decisão, rótulos futuros bem definidos, modelo e tentativas versionados, comparação líquida fora da amostra no mesmo motor |
 
 ## Sequência de entregas
 
@@ -48,7 +51,9 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 3. **F2 — validação de pesquisa (início).** Fixar hipótese, parâmetros, controles sintéticos, métricas e cortes temporais antes da análise. Implementar auditoria causal, controles negativos e sensibilidade a custos; acrescentar walk-forward e inferência estatística somente quando houver histórico suficiente. O replay do livro já existe na F1. Fixtures sintéticas demonstram o método, não desempenho B3.
 4. **F3 — integração Monte Carlo.** Consumir o `quant-simulation-framework` por adaptador opcional e versão fixada. Usar histórico de retornos e pesos do QTRE para cenários de perda, drawdown e concentração; comparar com risco realizado fora da amostra. Manter separadas as hipóteses GBM, os cenários Student-t e as métricas históricas. Entrega: cenário reproduzível com seed, parâmetros, origem dos dados e limitações.
 5. **F4 — dados brasileiros auditados.** Só introduzir barras, eventos, universo histórico e benchmark reais após verificar licença, cobertura, deslistados, correções e timestamps de disponibilidade. Entrega: relatório de qualidade de dados e rótulos explícitos para qualquer viés remanescente.
-6. **F5 — estudo final congelado.** Fixar código, dados, parâmetros e janela de teste antes de avaliá-la; publicar comparação líquida, incerteza, turnover, exposição, capacidade aproximada e falhas. Entrega: comando único de reprodução, manifesto e relatório que distingue achado, hipótese e limitação.
+6. **F5 — referência histórica.** Definir o corte de desenvolvimento, validação e teste final antes da análise; avaliar o momentum e os controles somente nas janelas de desenvolvimento e validação. Registrar tentativas, custos, benchmark e limites sem usar a janela final para escolher parâmetros. Entrega: referência reproduzível pronta para a comparação.
+7. **F6 — extensão supervisionada de ML.** Formular antes do treino a pergunta incremental: um ranking aprendido entre ativos elegíveis melhora a carteira de momentum? Construir fatores apenas com dados disponíveis em cada decisão, definir rótulo pelo retorno futuro do horizonte escolhido, separar treino e validação no tempo e impedir que rótulos atravessem os cortes. Começar por um modelo linear regularizado; testar árvores somente se houver amostra e justificativa. Registrar fatores, rótulos, versões, hiperparâmetros, seed, tentativas e previsões. Usar o mesmo universo, regras de carteira, execução e custos da referência. Selecionar o modelo apenas na validação; acurácia ou probabilidade de alta, isoladas, não demonstram valor econômico. Entrega: experimento reproduzível com métricas preditivas e resultado líquido na validação.
+8. **F7 — comparação final congelada.** Fixar código, dados, parâmetros e modelos antes de abrir uma única janela final reservada para momentum, controles e ML. Publicar comparação líquida, incerteza, giro, exposição, capacidade aproximada e falhas; se o ML não melhorar a referência de modo robusto, relatar esse resultado. Entrega: comando de reprodução, manifestos e relatório que distingue achado, hipótese e limitação. RL pode ser proposto depois, em estudo separado, se uma decisão sequencial concreta justificar sua complexidade.
 
 ## Regras de pesquisa
 
@@ -58,6 +63,7 @@ A conversa “Análise de projetos Quant” originou a direção de portfólio: 
 - Cada tentativa de estratégia ou ajuste de parâmetro fica registrada. O período de teste final não serve para escolher parâmetros; se for consultado para isso, deixa de ser teste final.
 - Incerteza estatística usa método adequado à dependência temporal e ao tamanho da amostra. Não usar um p-valor isolado como prova de vantagem econômica.
 - Dados sintéticos testam software e causalidade. Resultados de ações B3 exigem fonte, direitos e auditoria próprios.
+- Para ML, fatores respeitam `available_at ≤ decision_at`; rótulos dependem apenas do futuro usado no treino e nunca entram como informação de decisão. A janela final reservada não serve para selecionar fatores, modelo, limiar ou calibração.
 
 ## Próxima entrega concreta
 
