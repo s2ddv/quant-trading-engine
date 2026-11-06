@@ -19,6 +19,7 @@ A direção do portfólio reúne pesquisa quantitativa, backtesting rigoroso e v
 | Concluído no sintético — F2 | Controles e sensibilidade a custos | Protocolo v1, auditoria causal, `cash`, `equal_weight` e nove cenários de custo com replay e testes; monotonicidade só é exigida com fills fixos |
 | Depois — F2 | Avaliar robustez quando houver histórico suficiente | Separação temporal, tentativas registradas e incerteza com método declarado |
 | Depois dos dados auditados | Validar o momentum como referência em janelas de desenvolvimento e validação | Universo, benchmark e custos comparáveis; tentativas registradas; janela final reservada para comparação com ML |
+| Preparação ML v1 | Definir exemplos e divisões temporais sintéticas sem treino | [Protocolo ML v1](protocolo-ml-v1.md), contrato de disponibilidade e testes de purga/vazamento |
 | Depois da referência | Avaliar um ranking supervisionado de ML | Fatores e rótulos causais; modelo simples antes de modelos complexos; mesma carteira e execução; avaliação temporal e registro do modelo |
 | Publicação | Comparar referência e ML na janela final reservada | Retorno líquido, risco, giro, custos, incerteza e limites; fonte de dados e direitos auditados; reprodução de ambas as execuções |
 
