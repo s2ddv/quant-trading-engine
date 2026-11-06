@@ -60,19 +60,29 @@ def run_f1_two_formations(snapshot, *, first_decision_at: datetime,
     return run_f1_monthly(snapshot, decision_ats=(first_decision_at, second_decision_at), config=config)
 
 
-def run_f1_monthly(snapshot, *, decision_ats, config: F1Config = F1Config()):
+def run_f1_monthly(snapshot, *, decision_ats, config: F1Config = F1Config(),
+                   control_id: str | None = None):
     """Run successive monthly decisions on one synthetic, continuously marked book."""
     decisions = tuple(decision_ats)
     if len(decisions) < 2:
         raise ValueError("monthly run requires at least two decisions")
     with localcontext(Context(prec=28)):
-        result = run_f1(snapshot, decision_at=decisions[0], config=config)
+        result = run_f1(snapshot, decision_at=decisions[0], config=config, control_id=control_id)
         for cycle_index, decision_at in enumerate(decisions[1:], 2):
-            result = _extend(snapshot, result, decision_at, config, cycle_index)
+            result = _extend(snapshot, result, decision_at, config, cycle_index, control_id)
         return result
 
 
-def _extend(snapshot, first, second_decision_at, config, cycle_index):
+def run_f2_control(snapshot, *, decision_ats, control_id: str,
+                   config: F1Config = F1Config()):
+    """Run a named synthetic control on the same monthly execution contract."""
+    if control_id not in ("cash", "equal_weight"):
+        raise ValueError("control_id must be cash or equal_weight")
+    return run_f1_monthly(snapshot, decision_ats=decision_ats, config=config,
+                          control_id=control_id)
+
+
+def _extend(snapshot, first, second_decision_at, config, cycle_index, control_id):
     snapshot.check_as_of(second_decision_at)
     config.validate()
     first_decision_at = datetime.fromisoformat(first["manifest"]["decision_at"])
@@ -140,10 +150,19 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
     formation_nav = bridge_nav[-1]
     if formation_nav["status"] != "COMPLETE":
         raise ValueError("monthly formation has incomplete NAV")
-    signals = momentum_12_2(snapshot, decision_at=second_decision_at, formation_session=day)
-    selected = sorted((s for s in signals if s.eligible), key=lambda s: (-s.score, s.instrument_id))[:10]
-    portfolio_reason = "targets_formed" if len(selected) >= 5 else "fewer_than_five_eligible"
-    if len(selected) < 5:
+    signals = (() if control_id == "cash" else
+               momentum_12_2(snapshot, decision_at=second_decision_at, formation_session=day))
+    selected = sorted((s for s in signals if s.eligible),
+                      key=(lambda s: s.instrument_id) if control_id == "equal_weight" else
+                      (lambda s: (-s.score, s.instrument_id)))
+    if control_id != "equal_weight":
+        selected = selected[:10]
+    if control_id == "cash":
+        portfolio_reason = "cash_control"
+    elif selected and (control_id == "equal_weight" or len(selected) >= 5):
+        portfolio_reason = "targets_formed"
+    else:
+        portfolio_reason = "no_eligible" if control_id == "equal_weight" else "fewer_than_five_eligible"
         selected = []
     weight = min(Decimal(1) / len(selected), config.max_name_weight) if selected else Decimal(0)
     eligible = {s.instrument_id: s for s in selected}
@@ -259,6 +278,8 @@ def _extend(snapshot, first, second_decision_at, config, cycle_index):
         manifest.update(schema_version=5, model_id=MONTHLY_MODEL, decision_windows=windows)
     if any(row["kind"] == "delisting_ex" for row in first["ledger"] + tuple(book.ledger)):
         manifest["event_schema_version"] = 2
+    if control_id is not None:
+        manifest["model_id"] = f"synthetic-f2-{control_id}-v1"
     del manifest["run_id"]
     manifest["run_id"] = sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return dict(manifest=manifest, signals=first["signals"] + signals,

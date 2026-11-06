@@ -83,10 +83,14 @@ def _affordable_fill(opening, maximum, cash, config):
     return low * config.lot
 
 
-def _plan_orders(snapshot, signals, decision_at, sessions, config):
-    selected = sorted((s for s in signals if s.eligible), key=lambda s: (-s.score, s.instrument_id))[:10]
-    if len(selected) < 5:
-        return (), "fewer_than_five_eligible"
+def _plan_orders(snapshot, signals, decision_at, sessions, config, *, equal_weight=False):
+    selected = sorted((s for s in signals if s.eligible),
+                      key=(lambda s: s.instrument_id) if equal_weight else
+                      (lambda s: (-s.score, s.instrument_id)))
+    if not equal_weight:
+        selected = selected[:10]
+    if not selected or (not equal_weight and len(selected) < 5):
+        return (), "no_eligible" if equal_weight else "fewer_than_five_eligible"
     weight = min(Decimal(1) / len(selected), config.max_name_weight)
     reserve = (1 + (config.half_spread_bps + config.slippage_bps + config.fees_bps) / 10000
                + config.opening_reserve)
@@ -180,23 +184,28 @@ def _code_hash() -> str:
 
 
 def run_f1(snapshot: Snapshot, *, decision_at: datetime, config: F1Config = F1Config(),
-           formation_session: str | None = None):
+           formation_session: str | None = None, control_id: str | None = None):
     """A single formation. Sales and repeated rebalancing are outside this API."""
     with localcontext(Context(prec=28)):
         snapshot.check_as_of(decision_at)
         config.validate()
-        return _run(snapshot, decision_at.astimezone(timezone.utc), config, formation_session)
+        if control_id not in (None, "cash", "equal_weight"):
+            raise ValueError("unknown synthetic control")
+        return _run(snapshot, decision_at.astimezone(timezone.utc), config, formation_session, control_id)
 
 
-def _run(snapshot, decision_at, config, formation_session):
+def _run(snapshot, decision_at, config, formation_session, control_id):
     formation = formation_sessions(snapshot, decision_at, formation_session)[-1]["session"]
-    signals = momentum_12_2(snapshot, decision_at=decision_at, formation_session=formation)
+    signals = (() if control_id == "cash" else
+               momentum_12_2(snapshot, decision_at=decision_at, formation_session=formation))
     sessions = [r for r in snapshot.payload["calendar"]["sessions"] if instant(r["open_at"]) > decision_at][:config.expiry_sessions]
     if len(sessions) != config.expiry_sessions:
         raise ValueError("snapshot lacks the full order expiry window")
     for session in sessions:
         snapshot.check_as_of(instant(session["close_at"]) + timedelta(minutes=config.mark_delay_minutes))
-    orders, portfolio_reason = _plan_orders(snapshot, signals, decision_at, sessions, config)
+    orders, portfolio_reason = (((), "cash_control") if control_id == "cash" else
+                                _plan_orders(snapshot, signals, decision_at, sessions, config,
+                                             equal_weight=control_id == "equal_weight"))
     states = {o["order_id"]: dict(order_id=o["order_id"], instrument_id=o["instrument_id"],
                                   remaining=o["quantity"], filled=0, status="PENDING", reason="awaiting_open") for o in orders}
     book = _Book(config.initial_cash)
@@ -262,6 +271,9 @@ def _run(snapshot, decision_at, config, formation_session):
                     monetary_rounding="ROUND_HALF_UP; slippage absorbs cent residual",
                     settlement="synthetic_immediate", formation_session=formation,
                     decision_at=decision_at.isoformat(), config=config_data)
+    if control_id is not None:
+        manifest["control_id"] = control_id
+        manifest["model_id"] = f"synthetic-f2-{control_id}-v1"
     if any(row["kind"] == "delisting_ex" for row in book.ledger):
         manifest["event_schema_version"] = 2
     manifest["run_id"] = sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -269,4 +281,4 @@ def _run(snapshot, decision_at, config, formation_session):
                 portfolio_reason=portfolio_reason, fills=tuple(fills), ledger=tuple(book.ledger), nav=tuple(nav))
 
 
-from .rebalance import run_f1_monthly, run_f1_two_formations
+from .rebalance import run_f1_monthly, run_f1_two_formations, run_f2_control

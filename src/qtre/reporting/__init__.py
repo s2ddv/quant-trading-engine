@@ -144,6 +144,13 @@ def replay_f1(directory: str | Path) -> dict:
 
 
 def _reconstruct(snapshot, run, tables):
+    control_id = run.get("control_id")
+    if control_id not in (None, "cash", "equal_weight"):
+        raise ReplayError("unknown synthetic control")
+    if control_id is not None:
+        _require(run["model_id"], f"synthetic-f2-{control_id}-v1", "control model")
+    if control_id == "cash" and any(tables[table] for table in ("orders", "order_states", "fills", "ledger")):
+        raise ReplayError("cash control cannot trade or post events")
     calendar = {s["session"]: s for s in snapshot.payload["calendar"]["sessions"]}
     nav_days = [row["session"] for row in tables["nav"]]
     decision = datetime.fromisoformat(run["decision_at"].replace("Z", "+00:00"))
@@ -461,5 +468,6 @@ def _reconstruct(snapshot, run, tables):
         _require(row, expected, f"NAV {day}")
         results.append(expected)
     _require(cash, Decimal(tables["ledger"][-1]["cash_brl"]) if tables["ledger"] else initial, "final cash")
-    return {"run_id": run["run_id"], "cash_brl": cash, "positions": positions,
+    return {"run_id": run["run_id"], "control_id": run.get("control_id"),
+            "cash_brl": cash, "positions": positions,
             "cost_basis": bases, "receivables": receivables, "nav": tuple(results)}

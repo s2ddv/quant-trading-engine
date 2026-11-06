@@ -7,6 +7,7 @@ from pathlib import Path
 
 from qtre.data.snapshot import load_snapshot
 from qtre.reporting import ReplayError, _json, _load_json, replay_f1
+from qtre.signals import momentum_12_2
 
 AUDIT_SCHEMA_VERSION = 1
 
@@ -37,6 +38,9 @@ def audit_f1_run(directory: str | Path) -> dict:
               "artifact_hashes": envelope["files"], "status": "INVALID", "findings": [],
               "checks": ["replay", "decision_inputs", "order_before_fill",
                          "source_provenance", "nav_completeness"]}
+    if envelope["run"].get("control_id") is not None:
+        report["control_id"] = envelope["run"]["control_id"]
+        report["checks"].append("control_targets")
     try:
         rebuilt = replay_f1(root)
         snapshot = load_snapshot(root / "snapshot.json")
@@ -53,6 +57,19 @@ def audit_f1_run(directory: str | Path) -> dict:
             {"decision_at": envelope["run"]["decision_at"],
              "formation_session": envelope["run"]["formation_session"]}]
         decisions = {_instant(w["decision_at"]): w for w in windows}
+        if envelope["run"].get("control_id") == "equal_weight":
+            cap = Decimal(envelope["run"]["config"]["max_name_weight"])
+            for decision_at, window in decisions.items():
+                eligible = {s.instrument_id for s in momentum_12_2(
+                    snapshot, decision_at=decision_at,
+                    formation_session=window["formation_session"]) if s.eligible}
+                weight = min(Decimal(1) / len(eligible), cap) if eligible else Decimal(0)
+                for order in orders:
+                    if _instant(order["created_at"]) != decision_at:
+                        continue
+                    expected = weight if order["instrument_id"] in eligible else Decimal(0)
+                    if Decimal(order["target_weight"]) != expected:
+                        raise ValueError(f"order {order['order_id']}: equal weight target mismatch")
         by_order = {o["order_id"]: o for o in orders}
         for order in orders:
             label = f"order {order['order_id']}"
