@@ -51,7 +51,7 @@ handoffs. Obtain independent review for substantive numerical/causal changes.
 <!-- BEGIN CODEX QUANT OBSIDIAN v1 -->
 ## Contexto e registro no Obsidian
 
-Este projeto participa da integração persistente com o vault `Quant Research`.
+Este projeto participa da integração persistente com o vault `AI Quant`.
 Leia `~/.codex/quant-obsidian.json` e a seção "Base de conhecimento Quant no Obsidian"
 de `~/.codex/AGENTS.md`. Antes de implementar modelos, consulte a página deste projeto,
 as pesquisas, decisões e experimentos pertinentes, além dos contratos do repositório.
