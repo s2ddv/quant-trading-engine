@@ -30,6 +30,10 @@ The [third-formation contract](docs/contrato-f1-terceira-formacao.md) fixes the 
 
 F1 is complete within this controlled synthetic scope. The next phase, F2, starts with a fixed research protocol, synthetic controls, and an audit of the causal event trail. The four synthetic decisions exercise software behavior; they are too few for a meaningful out-of-sample performance claim.
 
+F2 includes a [pre-registered synthetic protocol](docs/protocolo-pesquisa-f2-v1.md), a [causal audit](docs/auditoria-f2-v1.md), [`cash` and `equal_weight` controls](docs/controles-f2-v1.md), and [cost sensitivity scenarios](docs/sensibilidade-custos-f2-v1.md), all within synthetic scope. A [descriptive run summary](docs/resumo-f2-v1.md) is reviewed locally on `codex/f2-summary-doc-reconcile`; it reports costs and coverage after independent replay and withholds cumulative return when any NAV mark is incomplete. The summary has not been published.
+
+The dated [project status tracker](docs/status-projeto.md) separates published synthetic milestones, local work, and market validation that has not yet occurred. Supervised ML remains a research plan; there is no trained model.
+
 ```python
 from datetime import datetime, timezone
 from qtre.backtest import run_f1_monthly
