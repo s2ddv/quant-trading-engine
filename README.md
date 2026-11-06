@@ -28,11 +28,11 @@ The [second synthetic formation](docs/contrato-f1-segunda-formacao.md) adds a sa
 
 The [third-formation contract](docs/contrato-f1-terceira-formacao.md) fixes the March decision's orders, costs, cash, and NAV by hand. `run_f1_monthly` repeats the causal monthly cycle over a caller-supplied sequence of decisions; a fourth decision is also exercised in tests. [Artifact schema 4](docs/artefatos-f1-v4.md) stores every window for independent replay. A [synthetic delisting contract](docs/contrato-f1-deslistagem-sintetica.md) covers both a declared cash exit and an unresolved exit; the latter keeps NAV incomplete. [Snapshot schema 2](docs/contrato-snapshot-v2.md) and [artifact schema 5](docs/artefatos-f1-v5.md) version the declared cash event. Choose a new output directory for each run: artifact writing refuses to silently replace an existing directory.
 
-F1 is complete within this controlled synthetic scope. The next phase, F2, starts with a fixed research protocol, synthetic controls, and an audit of the causal event trail. The four synthetic decisions exercise software behavior; they are too few for a meaningful out-of-sample performance claim.
+F1 is complete within this controlled synthetic scope. F2 uses a fixed research protocol, synthetic controls, and an audit of the causal event trail. The four synthetic decisions exercise software behavior; they are too few for a meaningful out-of-sample performance claim.
 
-F2 includes a [pre-registered synthetic protocol](docs/protocolo-pesquisa-f2-v1.md), a [causal audit](docs/auditoria-f2-v1.md), [`cash` and `equal_weight` controls](docs/controles-f2-v1.md), and [cost sensitivity scenarios](docs/sensibilidade-custos-f2-v1.md), all within synthetic scope. A [descriptive run summary](docs/resumo-f2-v1.md) is reviewed locally on `codex/f2-summary-doc-reconcile`; it reports costs and coverage after independent replay and withholds cumulative return when any NAV mark is incomplete. The summary has not been published.
+F2 includes a [pre-registered synthetic protocol](docs/protocolo-pesquisa-f2-v1.md), a [causal audit](docs/auditoria-f2-v1.md), [`cash` and `equal_weight` controls](docs/controles-f2-v1.md), and [cost sensitivity scenarios](docs/sensibilidade-custos-f2-v1.md), all within synthetic scope. A [descriptive run summary](docs/resumo-f2-v1.md) reports costs and coverage after independent replay and withholds cumulative return when any NAV mark is incomplete.
 
-The dated [project status tracker](docs/status-projeto.md) separates published synthetic milestones, local work, and market validation that has not yet occurred. Supervised ML remains a research plan; there is no trained model.
+The dated [project status tracker](docs/status-projeto.md) separates completed synthetic milestones from market validation that has not yet occurred. Supervised ML remains a research plan; there is no trained model.
 
 ```python
 from datetime import datetime, timezone

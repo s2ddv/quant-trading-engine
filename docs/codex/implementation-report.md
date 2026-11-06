@@ -47,7 +47,7 @@ There are no BLOCKED authorized local implementation items.
 | 5: lint and formatting checks | COMPLETED | New infrastructure fully gated; fatal-error lint on legacy source without reformat |
 | 5: reproducible commands and dependency environment | COMPLETED | make setup/check/core-test/codex-check/experiment/benchmark; pip check clean |
 | 5: CI workflow syntax/local commands | COMPLETED | YAML structure and all local job commands validated |
-| 5: hosted GitHub Actions / Python 3.10 runtime | COMPLETED | Later run 42221699255 passed on commit `93d8dd9` for Python 3.10 and 3.14; local F2 summary is newer and outside that run |
+| 5: hosted GitHub Actions / Python 3.10 runtime | COMPLETED | Later run 42221699255 passed on commit `93d8dd9` for Python 3.10 and 3.14; F2 summary is newer and outside that run |
 | 5: continuous deployment | NOT APPLICABLE | No deployment requested or configured |
 | 6: tracking choice and workflow | COMPLETED | Standard-library JSON lifecycle over existing artifacts; no MLflow service needed |
 | 6: IDs/config/data range/hash/seed/Git/environment/artifacts/status | COMPLETED | Persisted in experiment.json and cross-checked against engine evidence |
@@ -168,7 +168,7 @@ were changed.
 
 | Item | Status | Next step |
 |---|---|---|
-| Hosted CI evidence | COMPLETED for commit `93d8dd9` | Run 42221699255: both Python 3.10 and 3.14 jobs completed successfully; later local work needs its own verification |
+| Hosted CI evidence | COMPLETED for commit `93d8dd9` | Run 42221699255: both Python 3.10 and 3.14 jobs completed successfully; later work needs its own hosted verification |
 | Python 3.10 runtime and conditional dependency resolution | COMPLETED in hosted CI | Both matrix jobs passed setup and validation; no local Python 3.10 runtime was installed |
 | Configured-role execution and desktop UI/worktree lifecycle | PARTIAL | Exercise roles and toolbar/setup in the next appropriate desktop task; do not confuse config discovery with execution |
 | Hermetic builds | PARTIAL | Versions pinned, not wheel hashes/container/OS images; add only if stronger supply-chain reproducibility becomes required |
@@ -193,7 +193,7 @@ for supported configuration, handoffs and experiment contracts.
 GitHub Actions [run 42221699255](https://github.com/s2ddv/quant-trading-engine/actions/runs/42221699255)
 completed successfully for Python 3.10 and 3.14 on `93d8dd9`. Both jobs passed
 setup, lint/configuration/tests, original unittest suite and synthetic experiment
-reproduction. This proves the published infrastructure commit, not the local F2
+reproduction. This proves the published infrastructure commit, not the later F2
 summary or current documentation. In the isolated reconciliation checkout,
 `make codex-check` again discovered five skills and loaded four role configs;
 `make config-check` validated four action definitions and the CI structure.
