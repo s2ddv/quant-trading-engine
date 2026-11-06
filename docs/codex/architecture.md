@@ -80,7 +80,9 @@ project trust, with plugins/apps disabled and no copied credentials/model turn.
 It does not change global settings. `make config-check` is the portable offline
 structural check; the live CLI probe requires POSIX and installed compatible Codex.
 
-Custom-role spawning and desktop toolbar clicks were not exercised. The collaboration
+Custom-role spawning and desktop toolbar clicks remain unverified. A managed
+worktree was created during the 06/11 reconciliation, but automatic setup was
+not exercised. The collaboration
 review used session agents, independently of the four newly configured role entries.
 Official reference context: [subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents),
 [skills](https://learn.chatgpt.com/docs/build-skills), and

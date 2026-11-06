@@ -77,3 +77,9 @@ validation passed 140 cases; the original unittest suite still passed 123 cases.
 Two experiment attempts produced identical verified engine artifacts. See
 [implementation report](implementation-report.md) for exact evidence, original-file
 preservation, dependency additions and remaining hosted/UI verification limits.
+
+## Subsequent CI evidence (06/11/2026)
+
+The original audit boundary has since changed: [run 42221699255](https://github.com/s2ddv/quant-trading-engine/actions/runs/42221699255)
+passed both Python 3.10 and 3.14 jobs on `93d8dd9`. That run did not include
+the later local F2 summary. The preceding findings describe the earlier baseline.

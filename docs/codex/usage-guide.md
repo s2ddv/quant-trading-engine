@@ -16,7 +16,7 @@ Setup creates only `.venv`, installs the pinned `requirements-dev.txt`, and inst
 the package editable without build isolation or dependency resolution. First setup
 requires package-index access; no global package or Codex settings are changed.
 Python >=3.10 and POSIX make are required. Fedora Python 3.14.7 was locally tested;
-Python 3.10 is included in CI but was not installed locally. On Windows use WSL for
+Python 3.10 was also verified by the hosted matrix run 42221699255; it was not installed locally. On Windows use WSL for
 these Makefile commands and the POSIX Codex probe. Commands run serially with common
 numerical-library thread counts capped at one.
 
@@ -37,8 +37,9 @@ The project environment is `.codex/environments/environment.toml`. It supplies:
 | Synthetic experiment | `make experiment` | New unique directory under ignored `.runs/` |
 | Bounded benchmark | `make benchmark` | Three repetitions plus warmup, output hash and timings |
 
-The setup hook runs `make setup` in new managed worktrees. These commands were
-validated directly; desktop toolbar clicks/worktree auto-setup were not exercised.
+The setup hook is configured to run `make setup` in new managed worktrees.
+Commands were validated directly and a managed worktree was created in a later task;
+desktop toolbar clicks and automatic setup were not verified.
 For an existing task, reload/reopen project context if role/action entries are not
 shown. Skills were both runtime-discovered and observed in this task's skill catalog.
 
@@ -122,8 +123,9 @@ ignored `.runs` or temporary directories.
 
 GitHub Actions configuration validates Python 3.10 and 3.14 serially, including setup,
 checks, the original suite, and experiment reproduction. Local structural YAML/TOML
-validation and equivalent commands passed. A hosted run is pending publication;
-there is no deployment/CD step. Do not push or merge without explicit authorization.
+validation and equivalent commands passed. The [hosted run 42221699255](https://github.com/s2ddv/quant-trading-engine/actions/runs/42221699255)
+completed successfully on commit `93d8dd9` for Python 3.10 and 3.14. It predates
+the local F2 summary and documentation reconciliation; there is no deployment/CD step. Do not push or merge without explicit authorization.
 
 No MCP installation is necessary. Existing GitHub tooling can later inspect remote
 CI and review evidence; official documentation search can clarify future API changes.

@@ -2,7 +2,8 @@
 
 Date: 2026-11-06. Branch: `codex/quant-research-environment`.
 Base HEAD: `e86375ffec978ab1f9edf8cfe9cabc7d0fc8da0f`.
-The environment is committed locally in four scoped commits. No push, merge,
+The environment was initially committed locally in four scoped commits.
+It was later published on `codex/quant-research-environment`; no merge,
 deployment or live trading occurred.
 
 The repository now has a functional local research-development environment: five
@@ -46,17 +47,17 @@ There are no BLOCKED authorized local implementation items.
 | 5: lint and formatting checks | COMPLETED | New infrastructure fully gated; fatal-error lint on legacy source without reformat |
 | 5: reproducible commands and dependency environment | COMPLETED | make setup/check/core-test/codex-check/experiment/benchmark; pip check clean |
 | 5: CI workflow syntax/local commands | COMPLETED | YAML structure and all local job commands validated |
-| 5: hosted GitHub Actions / Python 3.10 runtime | PARTIAL | Python 3.14.7 tested locally; 3.10 syntax checked only; hosted matrix awaits authorized publication |
+| 5: hosted GitHub Actions / Python 3.10 runtime | COMPLETED | Later run 42221699255 passed on commit `93d8dd9` for Python 3.10 and 3.14; local F2 summary is newer and outside that run |
 | 5: continuous deployment | NOT APPLICABLE | No deployment requested or configured |
 | 6: tracking choice and workflow | COMPLETED | Standard-library JSON lifecycle over existing artifacts; no MLflow service needed |
 | 6: IDs/config/data range/hash/seed/Git/environment/artifacts/status | COMPLETED | Persisted in experiment.json and cross-checked against engine evidence |
 | 6: evaluation metrics and minimal reproduction | COMPLETED | Existing audit/count/final-value metrics only; all eight engine artifacts match exactly |
 | 7: project instructions/skill discovery/custom config | COMPLETED | Runtime probe passed; skills also appeared in current desktop task catalog |
 | 7: setup/actions/worktree configuration | COMPLETED | Installed desktop schema inspected, configuration validated and commands executed directly |
-| 7: desktop action clicks and automatic worktree setup | PARTIAL | Configured behavior, no UI click or new managed worktree created; dedicated branch used |
+| 7: desktop action clicks and automatic worktree setup | PARTIAL | Managed worktree creation observed in a later task; toolbar clicks and setup hook remain unverified |
 | 7: external MCP additions | NOT APPLICABLE | No demonstrable need; no integration installed or authorized |
 | 8: local tests/configuration checks/preservation/docs | COMPLETED | Final evidence below; docs reflect actual scope |
-| 8: full cross-runtime/hosted/UI verification | PARTIAL | Limits explicitly retained above and below |
+| 8: full cross-runtime/hosted/UI verification | PARTIAL | Hosted Python matrix passed; role and toolbar execution remain unverified |
 
 ## Created and modified files
 
@@ -167,8 +168,8 @@ were changed.
 
 | Item | Status | Next step |
 |---|---|---|
-| Hosted CI evidence | PARTIAL | Publish only when authorized, then inspect both matrix jobs |
-| Python 3.10 runtime and conditional dependency resolution | PARTIAL | Let the configured hosted matrix validate, or provision a separate local runtime when desired |
+| Hosted CI evidence | COMPLETED for commit `93d8dd9` | Run 42221699255: both Python 3.10 and 3.14 jobs completed successfully; later local work needs its own verification |
+| Python 3.10 runtime and conditional dependency resolution | COMPLETED in hosted CI | Both matrix jobs passed setup and validation; no local Python 3.10 runtime was installed |
 | Configured-role execution and desktop UI/worktree lifecycle | PARTIAL | Exercise roles and toolbar/setup in the next appropriate desktop task; do not confuse config discovery with execution |
 | Hermetic builds | PARTIAL | Versions pinned, not wheel hashes/container/OS images; add only if stronger supply-chain reproducibility becomes required |
 | Research history and market validity | NOT APPLICABLE to infrastructure completion | Acquire audited historical data and sufficient chronological history before OOS/ML/market claims |
@@ -180,8 +181,21 @@ Local commit sequence: `a16dc97` (skills and agents), `e164c84`
 (validation, experiment tracking and CI), `860cf63` (complete project
 instructions, including the separately supplied Obsidian section), followed
 by this documentation commit. `~/.codex/quant-obsidian.json` still reports
-`vault_path: null`; no Obsidian note was written. A separate workspace draft
-records the pending destination without claiming synchronization.
+`vault_path: null` at the time; no Obsidian note was written by that
+original task. On 06/11 the confirmed `AI Quant` vault became accessible;
+the later reconciliation has its own record and does not rewrite that history.
 
 See [usage guide](usage-guide.md) for commands and [architecture](architecture.md)
 for supported configuration, handoffs and experiment contracts.
+
+## Verification update — 06/11/2026
+
+GitHub Actions [run 42221699255](https://github.com/s2ddv/quant-trading-engine/actions/runs/42221699255)
+completed successfully for Python 3.10 and 3.14 on `93d8dd9`. Both jobs passed
+setup, lint/configuration/tests, original unittest suite and synthetic experiment
+reproduction. This proves the published infrastructure commit, not the local F2
+summary or current documentation. In the isolated reconciliation checkout,
+`make codex-check` again discovered five skills and loaded four role configs;
+`make config-check` validated four action definitions and the CI structure.
+Configured role execution, toolbar activation and automatic environment setup
+remain PARTIAL because they were not exercised in the desktop UI.
