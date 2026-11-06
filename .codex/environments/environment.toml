@@ -1,0 +1,25 @@
+version = 1
+name = "Quant Trading Engine"
+
+[setup]
+script = "make setup"
+
+[[actions]]
+name = "Validate environment"
+icon = "test"
+command = "make check"
+
+[[actions]]
+name = "Core offline tests"
+icon = "test"
+command = "make core-test"
+
+[[actions]]
+name = "Synthetic experiment"
+icon = "run"
+command = "make experiment"
+
+[[actions]]
+name = "Bounded benchmark"
+icon = "debug"
+command = "make benchmark"

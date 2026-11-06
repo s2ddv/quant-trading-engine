@@ -1,0 +1,19 @@
+# Two children plus the primary coordinator: maximum three agents in total.
+[agents]
+max_concurrent_threads_per_session = 2
+
+[agents.quant_research]
+description = "Quant Research Agent: hypotheses, assumptions, baselines and experimental design."
+config_file = "agents/quant-research.toml"
+
+[agents.quant_developer]
+description = "Quant Developer Agent: bounded implementation and reproducible validation."
+config_file = "agents/quant-developer.toml"
+
+[agents.statistical_validation]
+description = "Statistical Validation Agent: independent temporal and statistical review."
+config_file = "agents/statistical-validation.toml"
+
+[agents.risk_code_review]
+description = "Risk & Code Review Agent: independent accounting, risk and code review."
+config_file = "agents/risk-code-review.toml"
