@@ -1,0 +1,44 @@
+name: Quant validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: quant-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.14"]
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Local development environment
+        run: make setup
+      - name: Lint, formatting, configuration and tests
+        run: make check
+      - name: Original standard-library suite
+        run: make core-test
+      - name: Synthetic experiment and exact reproduction
+        env:
+          PYTHONPATH: src:.
+        run: |
+          .venv/bin/python tools/qtre_experiment.py run --output .runs/ci-original
+          .venv/bin/python tools/qtre_experiment.py reproduce .runs/ci-original --output .runs/ci-reproduced
