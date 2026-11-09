@@ -71,7 +71,7 @@ def _report_run(root):
     }
 
 
-def compare_pair(left_root, right_root):
+def compare_pair(left_root, right_root, *, raise_on_fail=True):
     """Only assert cost and NAV monotonicity for identical fill schedules and sizes."""
     left_root, right_root = Path(left_root), Path(right_root)
     left_orders, right_orders = (_rows(root, "orders") for root in (left_root, right_root))
@@ -101,7 +101,7 @@ def compare_pair(left_root, right_root):
     result["complete_nav_nonincreasing"] = all(b <= a for a, b in complete_pairs)
     result["nav_points_compared"] = len(complete_pairs)
     result["monotonicity"] = "PASS" if result["costs_nondecreasing"] and result["complete_nav_nonincreasing"] else "FAIL"
-    if result["monotonicity"] == "FAIL":
+    if result["monotonicity"] == "FAIL" and raise_on_fail:
         raise ValueError("identical fills violate cost or NAV monotonicity")
     return result
 
