@@ -149,7 +149,13 @@ PYTHONPATH=src python3 -m qtre.validation.comparative_report examples/f2_cost_se
 
 Para gerar o JSON v1, use `--format json`; a saída pode ser redirecionada para um arquivo fora do diretório de origem. O leitor exige os nove subdiretórios, `sensitivity.json` e as auditorias já persistidas. Ele confere replay, auditoria, hashes, identidades, conciliação e comparações antes de emitir qualquer relatório. Uma fonte inválida produz `INVALID_SOURCE` e código de saída 2. A tabela lista custos por rubrica e as seis comparações, mas o JSON contém também identidades e estados de ausência.
 
+```sh
+PYTHONPATH=src python3 -m qtre.validation.comparative_report examples/f2_cost_sensitivity_v1 --format json
+```
+
 Na fixture observada, `momentum-base` tem NAV final de R$ 101.248,22 e custo de R$ 90,78, mas retorno acumulado indisponível pela marca `NAV_INCOMPLETO` de 04/02/2025. Os pares de custos com posições têm `NOT_COMPARABLE_EXECUTION_CHANGED` por diferenças nos fills. A leitura desses quatro ciclos sintéticos não demonstra desempenho B3.
+
+Na revisão de 09/11/2026, o leitor passou a rejeitar links simbólicos nos seis arquivos do envelope e a exigir as mesmas hipóteses de liquidação, arredondamento e precisão entre as três estratégias. Um custo numérico malformado agora gera `INVALID_SOURCE` com o caminho da execução. Duas leituras consecutivas dos nove artefatos geraram os mesmos bytes JSON (SHA-256 `31c98c6539791772d9ad8cb79f914909598ddeca11ef587fc0b911bdfde4567c`); os hashes dos 73 arquivos de origem permaneceram iguais antes e depois. Isso verifica a leitura local desses arquivos, sem certificar dados de mercado ou desempenho.
 
 ## Verificação documental anterior à implementação
 

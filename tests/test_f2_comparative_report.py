@@ -99,6 +99,22 @@ class ComparativeReportTests(unittest.TestCase):
                 with self.assertRaisesRegex(InvalidSource, "common execution assumptions mismatch"):
                     _validate_identities(SOURCE, altered)
 
+    def test_malformed_cost_is_reported_as_invalid_source(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "source"
+            copytree(SOURCE, root)
+            run = root / "cash-base"
+            manifest_path = run / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["run"]["config"]["fees_bps"] = "invalid"
+            manifest_path.write_text(json.dumps(manifest))
+            audit_path = run / "audit.json"
+            audit = json.loads(audit_path.read_text())
+            audit["manifest_sha256"] = sha256(manifest_path.read_bytes()).hexdigest()
+            audit_path.write_text(json.dumps(audit))
+            with self.assertRaisesRegex(InvalidSource, "cash-base.*invalid scenario cost"):
+                read_comparative_report(root)
+
     def test_changed_sensitivity_and_missing_run_are_rejected(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / "source"

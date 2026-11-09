@@ -1,7 +1,7 @@
 """Read and compare nine persisted synthetic F2 cost runs."""
 
 import argparse
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from pathlib import Path
 
@@ -63,8 +63,11 @@ def _run_cell(root: Path, strategy: str, scenario: str, sensitivity: dict) -> tu
     _require(run.get("control_id") == (None if strategy == "momentum" else strategy),
              path, "strategy control mismatch")
     expected_costs = dict(zip(_COST_KEYS, next(row[1:] for row in SCENARIOS if row[0] == scenario)))
-    _require(all(Decimal(run["config"][key]) == expected_costs[key] for key in _COST_KEYS),
-             path, "scenario costs mismatch")
+    try:
+        costs_match = all(Decimal(run["config"][key]) == expected_costs[key] for key in _COST_KEYS)
+    except InvalidOperation as exc:
+        raise InvalidSource(f"{path}: invalid scenario cost") from exc
+    _require(costs_match, path, "scenario costs mismatch")
     # audit_f1_run writes an audit only when absent; its existing bytes are checked above.
     summary = _report_run(path)
     _require(summary["run_id"] == run["run_id"], path, "replay identity mismatch")
@@ -143,7 +146,8 @@ def read_comparative_report(directory: str | Path) -> dict:
         for scenario, *_ in SCENARIOS:
             try:
                 cell, run = _run_cell(root, strategy, scenario, sensitivity["runs"][strategy][scenario])
-            except (OSError, ReplayError, ValueError, KeyError, TypeError, IndexError) as exc:
+            except (OSError, ReplayError, ValueError, KeyError, TypeError, IndexError,
+                    InvalidOperation) as exc:
                 raise InvalidSource(f"{root / f'{strategy}-{scenario}'}: {exc}") from exc
             runs[strategy][scenario], manifests[strategy][scenario] = cell, run
     _validate_identities(root, manifests)
@@ -214,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         report = read_comparative_report(args.directory)
-    except (ValueError, OSError, KeyError, TypeError, IndexError) as exc:
+    except (ValueError, OSError, KeyError, TypeError, IndexError, InvalidOperation) as exc:
         parser.exit(2, f"INVALID_SOURCE: {exc}\n")
     if args.format == "json":
         import sys
