@@ -1,5 +1,6 @@
 """Read and compare nine persisted synthetic F2 cost runs."""
 
+import argparse
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
@@ -61,21 +62,9 @@ def _run_cell(root: Path, strategy: str, scenario: str, sensitivity: dict) -> tu
     # audit_f1_run writes an audit only when absent; its existing bytes are checked above.
     summary = _report_run(path)
     _require(summary["run_id"] == run["run_id"], path, "replay identity mismatch")
-    _require(summary["config"] == sensitivity["config"], path, "sensitivity config mismatch")
-    for key in ("decisions", "sessions", "orders", "fills", "incomplete_sessions", "return_status"):
-        _require(summary[key] == sensitivity[key], path, f"sensitivity {key} mismatch")
-    for key in ("spread_cost", "slippage_cost", "fees", "total"):
-        _require(str(summary["costs_brl"][key]) == sensitivity["costs_brl"][key],
-                 path, f"sensitivity {key} mismatch")
-    for key in ("final_cash_brl", "final_receivable_brl", "final_positions_value_brl", "final_nav_brl"):
-        actual = summary[key]
-        _require((str(actual) if actual is not None else None) == sensitivity[key],
-                 path, f"sensitivity {key} mismatch")
-    _require((str(summary["complete_series_return"]) if summary["complete_series_return"] is not None else None)
-             == sensitivity["complete_series_return"], path, "sensitivity return mismatch")
+    observed = _load_json(_json(summary), str(path / "sensitivity.json"))
+    _require(observed == sensitivity, path, "sensitivity run mismatch")
     bps = summary["costs_bps"]["total"]
-    _require((str(bps) if bps is not None else None) == sensitivity["costs_bps"]["total"],
-             path, "sensitivity cost bps mismatch")
     cell = {
         "source_path": path.name,
         "run_id": run["run_id"],
@@ -157,8 +146,8 @@ def read_comparative_report(directory: str | Path) -> dict:
             path = root / f"{strategy}-{earlier}"
             result = compare_pair(path, root / f"{strategy}-{later}", raise_on_fail=False)
             prior = sensitivity["comparisons"][strategy][pair]
-            for key in ("fills_identical", "nav_schedule_identical", "monotonicity"):
-                _require(result[key] == prior[key], path, f"sensitivity comparison {pair} mismatch")
+            _require(_load_json(_json(result), str(path)) == prior, path,
+                     f"sensitivity comparison {pair} mismatch")
             reason = None
             if result["monotonicity"] == "NOT_COMPARABLE_EXECUTION_CHANGED":
                 reason = "fills_and_nav_schedule_differ" if not result["fills_identical"] and not result["nav_schedule_identical"] else \
@@ -202,3 +191,24 @@ def report_table(report: dict) -> str:
             lines.append(f"{strategy} {pair}: {comparison['monotonicity']}"
                          + (f" ({comparison['reason']})" if comparison["reason"] else ""))
     return "\n".join(lines) + "\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Read a persisted F2 comparative report")
+    parser.add_argument("directory", help="directory containing sensitivity.json and nine runs")
+    parser.add_argument("--format", choices=("json", "table"), default="table")
+    args = parser.parse_args(argv)
+    try:
+        report = read_comparative_report(args.directory)
+    except (ValueError, OSError, KeyError, TypeError, IndexError) as exc:
+        parser.exit(2, f"INVALID_SOURCE: {exc}\n")
+    if args.format == "json":
+        import sys
+        sys.stdout.buffer.write(report_json(report))
+    else:
+        print(report_table(report), end="")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
