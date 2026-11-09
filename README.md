@@ -32,6 +32,8 @@ F1 is complete within this controlled synthetic scope. F2 uses a fixed research 
 
 F2 includes a [pre-registered synthetic protocol](docs/protocolo-pesquisa-f2-v1.md), a [causal audit](docs/auditoria-f2-v1.md), [`cash` and `equal_weight` controls](docs/controles-f2-v1.md), and [cost sensitivity scenarios](docs/sensibilidade-custos-f2-v1.md), all within synthetic scope. A [descriptive run summary](docs/resumo-f2-v1.md) reports costs and coverage after independent replay and withholds cumulative return when any NAV mark is incomplete.
 
+The [F2 comparative reader](docs/contrato-relatorio-comparativo-f2-v1.md) combines the nine persisted runs without rerunning the engine or changing their files. Generate a human table with `PYTHONPATH=src python3 -m qtre.validation.comparative_report examples/f2_cost_sensitivity_v1` or deterministic JSON with the same command plus `--format json` (redirect stdout to a file outside the source directory if desired). It replays and causally audits each run, checks the recorded sensitivity report, and exits with `INVALID_SOURCE` if an input fails. The six comparisons retain `NOT_COMPARABLE_EXECUTION_CHANGED` when fills or NAV schedules differ. `UNAVAILABLE_INCOMPLETE_NAV` means a numeric final NAV may be visible while cumulative return remains unavailable. These four synthetic decisions do not establish B3 performance.
+
 The dated [project status tracker](docs/status-projeto.md) separates completed synthetic milestones from market validation that has not yet occurred. Supervised ML remains a research plan; there is no trained model.
 
 ```python

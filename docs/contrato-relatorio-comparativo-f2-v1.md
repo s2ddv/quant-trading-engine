@@ -1,6 +1,6 @@
 # Contrato v1 — relatório comparativo F2
 
-**Estado:** contrato documental proposto em 09/11/2026, America/Sao_Paulo. O leitor e este formato de saída ainda não foram implementados. A fonte observada é `examples/f2_cost_sensitivity_v1/` (nove execuções sintéticas e `sensitivity.json`). Este contrato não muda o [protocolo F2](protocolo-pesquisa-f2-v1.md), a [sensibilidade registrada](sensibilidade-custos-f2-v1.md) nem qualquer cálculo financeiro.
+**Estado:** contrato documental definido em 09/11/2026, America/Sao_Paulo; leitor v1 implementado em `src/qtre/validation/comparative_report.py`. A fonte observada é `examples/f2_cost_sensitivity_v1/` (nove execuções sintéticas e `sensitivity.json`). Este contrato não muda o [protocolo F2](protocolo-pesquisa-f2-v1.md), a [sensibilidade registrada](sensibilidade-custos-f2-v1.md) nem qualquer cálculo financeiro.
 
 ## Escopo e evidência
 
@@ -139,6 +139,18 @@ O bloco abaixo mostra **duas** das nove células e **um** dos seis pares, para c
 
 No caso `momentum-base`, `50712.22 + 0 + 50536.00 = 101248.22` BRL na última marca, mas a marca incompleta de 04/02/2025 impede o retorno da série. Nos três cenários com posições há 15, 16 e 15 fills; os quatro pares adjacentes de `momentum`/`equal_weight` têm `NOT_COMPARABLE_EXECUTION_CHANGED`. `cash` tem 66 marcas completas, nenhum fill e retorno sintético zero. A fixture cobre quatro decisões e não oferece janela fora da amostra, estimativa de incerteza ou evidência de desempenho B3.
 
-## Verificação desta entrega
+## Uso do leitor
 
-Foram lidos os contratos, proposta e artefatos persistidos; comparados os nove IDs e estados de auditoria; recalculados SHA-256 dos arquivos referidos pelos nove manifestos; conferidos campos do exemplo com `sensitivity.json` e `audit.json`. Não foram executados motor, backtest, replay, auditoria ou suíte de testes nesta entrega documental. O próximo passo é implementar e testar o leitor contra este contrato, inclusive fonte adulterada, identidade divergente, `NAV_INCOMPLETO`, nocional zero, fills diferentes e determinismo.
+Na raiz do repositório, a tabela aparece na saída padrão:
+
+```sh
+PYTHONPATH=src python3 -m qtre.validation.comparative_report examples/f2_cost_sensitivity_v1
+```
+
+Para gerar o JSON v1, use `--format json`; a saída pode ser redirecionada para um arquivo fora do diretório de origem. O leitor exige os nove subdiretórios, `sensitivity.json` e as auditorias já persistidas. Ele confere replay, auditoria, hashes, identidades, conciliação e comparações antes de emitir qualquer relatório. Uma fonte inválida produz `INVALID_SOURCE` e código de saída 2. A tabela lista custos por rubrica e as seis comparações, mas o JSON contém também identidades e estados de ausência.
+
+Na fixture observada, `momentum-base` tem NAV final de R$ 101.248,22 e custo de R$ 90,78, mas retorno acumulado indisponível pela marca `NAV_INCOMPLETO` de 04/02/2025. Os pares de custos com posições têm `NOT_COMPARABLE_EXECUTION_CHANGED` por diferenças nos fills. A leitura desses quatro ciclos sintéticos não demonstra desempenho B3.
+
+## Verificação documental anterior à implementação
+
+Foram lidos os contratos, proposta e artefatos persistidos; comparados os nove IDs e estados de auditoria; recalculados SHA-256 dos arquivos referidos pelos nove manifestos; conferidos campos do exemplo com `sensitivity.json` e `audit.json`. Não foram executados motor, backtest, replay, auditoria ou suíte de testes na etapa documental. A implementação e sua validação são uma etapa posterior, descrita acima.

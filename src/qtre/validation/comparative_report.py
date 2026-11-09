@@ -172,15 +172,20 @@ def report_json(report: dict) -> bytes:
 
 def report_table(report: dict) -> str:
     """Render a compact human readable table from the validated report."""
-    columns = ("strategy", "scenario", "decisions", "sessions", "orders", "fills", "costs BRL",
-               "cash BRL", "NAV BRL", "return status")
+    columns = ("strategy", "scenario", "decisions", "sessions", "orders", "fills",
+               "spread BRL", "slippage BRL", "fees BRL", "total BRL",
+               "cash BRL", "receivable BRL", "positions BRL", "NAV BRL", "return status")
     rows = [columns]
     for strategy in STRATEGIES:
         for scenario, *_ in SCENARIOS:
             cell = report["runs"][strategy][scenario]
             rows.append((strategy, scenario, str(cell["decisions"]), str(cell["sessions"]),
-                         str(cell["orders"]), str(cell["fills"]), str(cell["costs_brl"]["total"]),
-                         str(cell["final_cash_brl"]), str(cell["final_nav_brl"]), cell["return_status"]))
+                         str(cell["orders"]), str(cell["fills"]),
+                         *(str(cell["costs_brl"][key]) for key in
+                           ("spread_cost", "slippage_cost", "fees", "total")),
+                         str(cell["final_cash_brl"]), str(cell["final_receivable_brl"]),
+                         str(cell["final_positions_value_brl"]), str(cell["final_nav_brl"]),
+                         cell["return_status"]))
     widths = [max(len(row[index]) for row in rows) for index in range(len(columns))]
     lines = ["  ".join(value.ljust(widths[index]) for index, value in enumerate(row)).rstrip()
              for row in rows]
