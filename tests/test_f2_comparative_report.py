@@ -1,5 +1,6 @@
 """The comparative reader validates persisted sources without changing them."""
 
+from copy import deepcopy
 from decimal import Decimal
 from hashlib import sha256
 import json
@@ -9,7 +10,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from qtre.validation.comparative_report import (
-    InvalidSource, read_comparative_report, report_json, report_table,
+    InvalidSource, _validate_identities, read_comparative_report, report_json, report_table,
 )
 
 
@@ -70,6 +71,33 @@ class ComparativeReportTests(unittest.TestCase):
             with self.assertRaisesRegex(InvalidSource, "cash-base.*audit.json"):
                 read_comparative_report(root)
             self.assertFalse(path.exists())
+
+    def test_linked_artifact_is_rejected_without_changing_source(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "source"
+            copytree(SOURCE, root)
+            path = root / "cash-base" / "nav.jsonl"
+            path.unlink()
+            path.symlink_to(SOURCE / "cash-base" / "nav.jsonl")
+            before = file_hashes(SOURCE)
+            with self.assertRaisesRegex(InvalidSource, "cash-base/nav.jsonl.*linked artifact"):
+                read_comparative_report(root)
+            self.assertEqual(file_hashes(SOURCE), before)
+
+    def test_cross_strategy_execution_assumptions_are_required(self):
+        manifests = {strategy: {
+            scenario: json.loads((SOURCE / f"{strategy}-{scenario}" / "manifest.json").read_text())["run"]
+            for scenario in ("zero", "base", "high")}
+            for strategy in ("momentum", "equal_weight", "cash")}
+        for key, changed in (("settlement", "other"),
+                             ("monetary_rounding", "other"),
+                             ("decimal_precision", 30)):
+            with self.subTest(key=key):
+                altered = deepcopy(manifests)
+                for run in altered["cash"].values():
+                    run[key] = changed
+                with self.assertRaisesRegex(InvalidSource, "common execution assumptions mismatch"):
+                    _validate_identities(SOURCE, altered)
 
     def test_changed_sensitivity_and_missing_run_are_rejected(self):
         with TemporaryDirectory() as temporary:

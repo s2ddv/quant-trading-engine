@@ -5,7 +5,7 @@ from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 
-from qtre.reporting import ReplayError, _json, _load_json
+from qtre.reporting import FILES, ReplayError, _json, _load_json
 from qtre.validation.cost_sensitivity import SCENARIOS, STRATEGIES, _report_run, compare_pair
 
 
@@ -48,6 +48,12 @@ def _run_cell(root: Path, strategy: str, scenario: str, sensitivity: dict) -> tu
     _require(path.is_dir() and not path.is_symlink(), path, "missing or linked run directory")
     manifest, manifest_hash = _read_json(path / "manifest.json")
     audit, _ = _read_json(path / "audit.json")
+    _require(set(manifest["files"]) == set(FILES), path / "manifest.json",
+             "artifact file set mismatch")
+    for name in FILES:
+        artifact = path / name
+        _require(artifact.is_file() and not artifact.is_symlink(), artifact,
+                 "missing, unreadable or linked artifact")
     run = manifest["run"]
     _require(run["synthetic"] is True, path, "run is not synthetic")
     _require(audit["status"] == "VALID", path, "persisted audit is not VALID")
@@ -110,6 +116,9 @@ def _validate_identities(root: Path, manifests: dict) -> None:
             _require(all(run[key] == first[key] for key in
                          ("settlement", "monetary_rounding", "decimal_precision")),
                      path, "execution assumptions mismatch")
+            _require(all(run[key] == reference[key] for key in
+                         ("settlement", "monetary_rounding", "decimal_precision")),
+                     path, "common execution assumptions mismatch")
 
 
 def read_comparative_report(directory: str | Path) -> dict:
