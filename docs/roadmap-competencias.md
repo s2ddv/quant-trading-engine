@@ -45,6 +45,8 @@ A direção do portfólio reúne pesquisa quantitativa, backtesting rigoroso e v
 
 ## Sequência de entregas
 
+O [plano v1 de auditabilidade](plano-integracao-lacunas-qtre-v1.md) detalha quatro incrementos candidatos — trilha de decisão, gate de qualidade da fonte, impacto de revisões e proteção da janela final — com gates e aceites próprios. E1 pode começar no sintético; E2 acompanha F3; E3 depende de versões de fonte; E4 deve anteceder a abertura do teste final. É planejamento, sem alterar os marcos financeiros abaixo.
+
 1. **F0 — base causal consolidada e versionada.** Parser e fixtures sintéticas preservados, com contratos de disponibilidade temporal, identidade de instrumentos e calendário testados. Esta etapa não é um backtest.
 2. **F1 — backtest vertical sintético (concluído no escopo).** A fixture controlada demonstra universo datado, sinal 12–2, quatro decisões mensais, compra, venda total e parcial, custos, lotes, split, dividendo, deslistagem com valor declarado ou desconhecido, livro e NAV. Artefatos dos esquemas 1 a 5 permitem replay independente. O valor desconhecido conserva a posição e torna o NAV incompleto; a próxima decisão exige uma marca completa. A liquidação e os preços são hipóteses sintéticas, sem resultado B3.
 3. **F2 — validação sintética (controles implementados).** Protocolo, auditoria causal, controles `cash` e `equal_weight`, sensibilidade a custos e replay estão versionados. O resumo descritivo F2 também foi revisado e versionado. Walk-forward e inferência estatística ainda exigem histórico suficiente. Fixtures sintéticas demonstram o método, não desempenho B3.
